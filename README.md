@@ -41,7 +41,3 @@ Each skill follows the structure:
 - **SKILL.md** - Skill metadata, triggers, procedure, and rules
 - **references/** - Supporting documentation
 - **scripts/** - Executable wrappers and helper scripts
-
-## License
-
-Internal CACI tooling.
