@@ -1,0 +1,49 @@
+# dbconnect
+
+A simple CLI for connecting to Oracle and SQL Server databases and executing SQL in agentic workflows.
+
+## Getting Started
+
+Build the application with:
+
+```ps1
+PS> .\build.ps1
+```
+
+## CLI Flags
+
+| Flag | Description |
+| ---- | ----------- |
+| `--help` | Print the help text. |
+| `--oracle` | Connect to an Oracle database using Kerberos. |
+| `--conn` | The connection string to use. |
+| `--use` | Specify a named connection to use. |
+| `--list` | List available connections. |
+| `--sql "sql statements;"` | SQL text to execute. |
+| `--sql <file_name>` | Execute SQL from a file. |
+| `--output <file_name>` | Write results to a CSV file. |
+
+## Connections
+
+You can create a `<NAMED>.connections` file for `dbconnect` to reference when connecting to a database.
+
+These are simple JSON files that store connection information:
+
+Example `DB.connections`:
+
+```json
+{
+    "connections": [
+        {
+            "name": "Oracle_Test",
+            "connectionstring": "Data Source=(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=oradb.fuseraft.com)(PORT=1521))(CONNECT_DATA=(SERVICE_NAME=fuseraft.oraclevcn.com)));User Id=/;TNS_ADMIN=C:\\TNS_ADMIN",
+            "type": "oracle"
+        },
+        {
+            "name": "SqlServer_Prod",
+            "connectionstring": "Data Source=fuseraft\\fuseraftdb;Initial Catalog=FuseraftDb;Trusted_Connection=yes;TrustServerCertificate=true;",
+            "type": "mssql"
+        }
+    ]
+}
+```
