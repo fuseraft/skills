@@ -1,0 +1,73 @@
+# .NET build artifacts
+bin/
+obj/
+*.dll
+*.exe
+*.pdb
+*.cache
+
+# User-specific files
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Rider
+.idea/
+*.sln.iml
+
+# Visual Studio Code
+.vscode/
+*.code-workspace
+
+# Visual Studio
+.vs/
+*.vsidx
+*.vspscc
+*.vsscc
+
+# Connection files (sensitive credentials)
+*.connections
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Test results
+TestResults/
+*.trx
+*.coverage
+
+# NuGet
+*.nupkg
+*.snupkg
+packages/
+.nuget/
+
+# Logs
+*.log
+logs/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Temporary files
+*.tmp
+*.temp
+*~
+
+# fuseraft session data
+.fuseraft/repl-sessions/
+.fuseraft/logs/
+.fuseraft/state/
+
+# Keep structure directories
+!.fuseraft/docs/.gitkeep
+!.fuseraft/tests/.gitkeep
+!.fuseraft/tests/fixtures/.gitkeep
+!.fuseraft/context/.gitkeep
+!.fuseraft/summaries/.gitkeep
+!.fuseraft/knowledge/decisions/.gitkeep
