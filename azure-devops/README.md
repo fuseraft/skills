@@ -151,11 +151,22 @@ Where possible, scripts should return:
 - backend information
 - diagnostics or error details when a backend cannot be used
 
+## Current scripts
+
+### Work items
+
+#### `scripts/work-item-get.py`
+Retrieves a work item by ID through REST.
+
+#### `scripts/work-item-query.py`
+Executes a WIQL query and returns matching work item IDs, with optional verbose expansion.
+
+#### `scripts/work-item-comment.py`
+Adds a comment to an existing work item through REST.
+
 ## Expected next scripts
 
 The planned v1 script surface includes:
-- `scripts/work-item-get.py`
-- `scripts/work-item-query.py`
 - `scripts/work-item-create.py`
 - `scripts/work-item-update.py`
 - `scripts/pr-list.py`

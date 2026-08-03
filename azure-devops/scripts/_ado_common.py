@@ -9,6 +9,7 @@ import json
 import os
 import shutil
 import sys
+from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode, urlparse
 from urllib.request import Request, urlopen
@@ -23,6 +24,26 @@ DEFAULT_ENV = {
 }
 
 DEFAULT_API_VERSION = "7.0"
+
+
+def _load_dotenv_if_present() -> None:
+    current = Path(__file__).resolve().parent
+    candidates = [current.parent / ".env", Path.cwd() / ".env"]
+    for candidate in candidates:
+        if not candidate.is_file():
+            continue
+        for raw_line in candidate.read_text(encoding="utf-8").splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            key = key.strip()
+            if key and key not in os.environ:
+                os.environ[key] = value.strip()
+        break
+
+
+_load_dotenv_if_present()
 
 
 KNOWN_CLOUD_HOSTS = {

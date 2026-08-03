@@ -138,6 +138,22 @@ Expected behavior:
 - optionally support a few safe presets for common tasks
 - return matched work item IDs and summary fields
 
+#### `scripts/work-item-comment`
+Purpose:
+- add a comment to an existing work item
+
+Suggested arguments:
+- `--id <work-item-id>`
+- `--comment <text>`
+- `--org <url>`
+- `--project <name>`
+- `--backend <auto|cli|rest>`
+- `--output <json|table|tsv>`
+
+Expected behavior:
+- create a new work item comment through REST
+- return the work item ID, comment ID, comment version, and comment text when available
+
 #### `scripts/work-item-create`
 Purpose:
 - create a work item with a small, practical field surface
