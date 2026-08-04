@@ -164,14 +164,65 @@ Executes a WIQL query and returns matching work item IDs, with optional verbose 
 #### `scripts/work-item-comment.py`
 Adds a comment to an existing work item through REST.
 
+#### `scripts/work-item-update.py`
+Updates an existing work item through REST using Azure DevOps JSON Patch.
+
+Supported update flags:
+- `--id`
+- `--title`
+- `--state`
+- `--assigned-to`
+- `--description`
+- repeated `--field NAME=VALUE`
+
+Example:
+
+```powershell
+python scripts/work-item-update.py --backend rest --id 48520 --state Active --assigned-to "user@example.com" --field Microsoft.VSTS.Common.Priority=1
+```
+
+#### `scripts/work-item-create.py`
+Creates a new work item through REST using Azure DevOps JSON Patch.
+
+Supported create flags:
+- `--type`
+- `--title`
+- `--description`
+- `--assigned-to`
+- repeated `--field NAME=VALUE`
+
+Example:
+
+```powershell
+python scripts/work-item-create.py --backend rest --type Bug --title "Example bug" --field Microsoft.VSTS.Common.Priority=1
+```
+
+#### `scripts/pr-list.py`
+Lists pull requests for a repository through REST.
+
+#### `scripts/pr-get.py`
+Retrieves a pull request by ID through REST, with optional threads and linked work item references.
+
+#### `scripts/pr-comment.py`
+Adds a pull request discussion thread through REST.
+
+Supported comment flags:
+- `--id`
+- `--comment`
+- `--status`
+- `--comment-type`
+- optional `--file-path`
+- optional `--right-file-start-line`, `--right-file-start-offset`, `--right-file-end-line`, `--right-file-end-offset`
+
+Example:
+
+```powershell
+python scripts/pr-comment.py --backend rest --repo MyRepo --id 123 --comment "Please add a null check here."
+```
+
 ## Expected next scripts
 
 The planned v1 script surface includes:
-- `scripts/work-item-create.py`
-- `scripts/work-item-update.py`
-- `scripts/pr-list.py`
-- `scripts/pr-get.py`
-- `scripts/pr-comment.py`
 - `scripts/pipeline-list.py`
 - `scripts/pipeline-runs.py`
 - `scripts/pipeline-run-queue.py`

@@ -315,8 +315,10 @@ def ado_rest_request(
     project: Optional[str] = None,
     query: Optional[Dict[str, Any]] = None,
     body: Optional[Any] = None,
+    body_content_type: str = "application/json",
     headers: Optional[Dict[str, str]] = None,
     api_version: str = DEFAULT_API_VERSION,
+    accept: str = "application/json",
 ) -> Dict[str, Any]:
     org = require_context_value(context, "org", "organization or collection URL")
     pat = require_context_value(context, "pat", "personal access token")
@@ -324,14 +326,18 @@ def ado_rest_request(
 
     request_headers = {
         "Authorization": get_basic_auth_header(pat),
-        "Accept": "application/json",
+        "Accept": accept,
     }
-    data: Optional[bytes] = None
-    if body is not None:
-        request_headers["Content-Type"] = "application/json"
-        data = json.dumps(body).encode("utf-8")
     if headers:
         request_headers.update(headers)
+
+    data: Optional[bytes] = None
+    if body is not None:
+        request_headers.setdefault("Content-Type", body_content_type)
+        if isinstance(body, bytes):
+            data = body
+        else:
+            data = json.dumps(body).encode("utf-8")
 
     request = Request(url=url, data=data, method=method.upper(), headers=request_headers)
 

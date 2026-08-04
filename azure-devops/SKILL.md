@@ -341,3 +341,53 @@ Start with this sequence:
 7. `scripts/pipeline-run-queue`
 
 This order establishes the shared setup contract first, then adds one useful read path per supported area before write operations.
+
+## Implemented write support
+
+In addition to the read-oriented scripts, this skill now includes:
+- `scripts/work-item-comment.py` for posting work item comments through REST
+- `scripts/work-item-update.py` for updating work item fields through REST with JSON Patch
+- `scripts/work-item-create.py` for creating work items through REST with JSON Patch
+- `scripts/pr-comment.py` for posting pull request discussion threads through REST
+
+`work-item-update.py` supports:
+- `--id <work-item-id>`
+- `--title <text>`
+- `--state <state>`
+- `--assigned-to <identity>`
+- `--description <text>`
+- repeated `--field <name=value>`
+
+Example:
+
+```powershell
+python scripts/work-item-update.py --backend rest --id 48520 --state Active --field Microsoft.VSTS.Common.Priority=1
+```
+
+`work-item-create.py` supports:
+- `--type <work-item-type>`
+- `--title <text>`
+- `--description <text>`
+- `--assigned-to <identity>`
+- repeated `--field <name=value>`
+
+Example:
+
+```powershell
+python scripts/work-item-create.py --backend rest --type Bug --title "Example bug" --field Microsoft.VSTS.Common.Priority=1
+```
+
+`pr-comment.py` supports:
+- `--repo <repository>`
+- `--id <pull-request-id>`
+- `--comment <text>`
+- `--status <thread-status>`
+- `--comment-type <text|codeChange>`
+- optional `--file-path <repo-relative-path>`
+- optional `--right-file-start-line`, `--right-file-start-offset`, `--right-file-end-line`, `--right-file-end-offset`
+
+Example:
+
+```powershell
+python scripts/pr-comment.py --backend rest --repo MyRepo --id 123 --comment "Please add a null check here."
+```
