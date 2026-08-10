@@ -197,6 +197,40 @@ Example:
 python scripts/work-item-create.py --backend rest --type Bug --title "Example bug" --field Microsoft.VSTS.Common.Priority=1
 ```
 
+#### `scripts/repo-list.py`
+Lists Azure DevOps Git repositories through REST.
+
+Supported flags:
+- `--all-projects` - list repositories across the whole organization or collection instead of a single project
+- `--include-links` - include the `_links` block for each repository
+
+Example:
+
+```powershell
+python scripts/repo-list.py --backend rest --output table
+python scripts/repo-list.py --backend rest --all-projects --output json
+```
+
+#### `scripts/code-search.py`
+Searches code across repositories through the Azure DevOps Code Search REST API.
+
+Supported flags:
+- `--text <query>` (required), e.g. `myFunction` or `ext:cs myFunction`
+- repeated `--repo <name>` to limit results to one or more repositories
+- repeated `--path <path>` to limit results to a repository-relative path prefix
+- repeated `--branch <name>` to limit results to a branch
+- repeated `--extension <ext>` to limit results to a file extension
+- `--top <count>` and `--skip <count>` for paging
+- `--include-facets` to include facet counts in the response
+
+Note: this requires the Code Search extension/feature to be installed and enabled for the organization or collection. On Azure DevOps Services (cloud), the search API is hosted on a dedicated `almsearch.dev.azure.com` host; the skill resolves this automatically. On Azure DevOps Server / on-prem collections, the same collection host is used.
+
+Example:
+
+```powershell
+python scripts/code-search.py --backend rest --text "ext:cs myFunction" --repo MyRepo --output table
+```
+
 #### `scripts/pr-list.py`
 Lists pull requests for a repository through REST.
 
@@ -222,10 +256,10 @@ python scripts/pr-comment.py --backend rest --repo MyRepo --id 123 --comment "Pl
 
 ## Expected next scripts
 
-The planned v1 script surface includes:
-- `scripts/pipeline-list.py`
-- `scripts/pipeline-runs.py`
-- `scripts/pipeline-run-queue.py`
+Pipeline-related work (`scripts/pipeline-list.py`, `scripts/pipeline-run-queue.py`) is deprioritized for now. Possible future additions include:
+- `scripts/work-item-link.py` for creating relationships between work items
+- `scripts/work-item-attach.py` for attaching files to work items
+- `scripts/pr-attach.py` or similar attachment support for pull requests
 
 ## Usage notes
 
@@ -235,9 +269,5 @@ The planned v1 script surface includes:
 
 ## Development notes
 
-At the moment, this repository contains the shared helper and foundation scripts only. The next implementation step is to add read-oriented REST-first scripts for:
-- work items
-- pull requests
-- pipelines
+This skill currently implements the shared helper, foundation scripts, and REST-first scripts for work items, pull requests, repository listing, code search, and pipeline run listing (see "Current scripts" above). The `--backend cli` option is accepted by all scripts but not yet implemented; every script currently requires `--backend rest` (or `auto`, which resolves to `rest`).
 
-That should provide a stable base before adding write operations.

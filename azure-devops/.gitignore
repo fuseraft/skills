@@ -33,3 +33,6 @@ Thumbs.db
 *.tmp
 *.bak
 .fuseraft/tests/
+
+# Local session/output dumps (may contain transcripts with sensitive data)
+output/

@@ -287,6 +287,37 @@ def get_basic_auth_header(pat: str) -> str:
     return "Basic " + base64.b64encode(token).decode("ascii")
 
 
+def resolve_search_base_url(org: str) -> str:
+    """Resolve the base URL to use for Azure DevOps Search API calls.
+
+    Azure DevOps Services (cloud) hosts the Search/Code Search API on a
+    dedicated ``almsearch.dev.azure.com`` host, with the organization name
+    kept in the path (e.g. ``https://dev.azure.com/my-org`` becomes
+    ``https://almsearch.dev.azure.com/my-org``).
+
+    Azure DevOps Server / on-prem collections do not use a separate search
+    host; the Search REST API (when the Code Search extension is installed)
+    is exposed on the same collection URL used for every other REST call.
+    """
+    normalized = normalize_org_url(org) or ""
+    org_info = classify_org_url(normalized)
+    if not org_info["valid"]:
+        return normalized
+
+    if org_info["cloud_host"]:
+        parsed = urlparse(normalized)
+        if parsed.netloc.lower().endswith("visualstudio.com"):
+            # https://{org}.visualstudio.com -> https://almsearch.dev.azure.com/{org}
+            org_name = parsed.netloc.split(".")[0]
+            path = f"/{org_name}{parsed.path}" if parsed.path else f"/{org_name}"
+        else:
+            # https://dev.azure.com/{org} -> https://almsearch.dev.azure.com/{org}
+            path = parsed.path
+        return f"{parsed.scheme}://almsearch.dev.azure.com{path}".rstrip("/")
+
+    return normalized
+
+
 def build_rest_url(
     org: str,
     path: str,
@@ -319,8 +350,9 @@ def ado_rest_request(
     headers: Optional[Dict[str, str]] = None,
     api_version: str = DEFAULT_API_VERSION,
     accept: str = "application/json",
+    base_url_override: Optional[str] = None,
 ) -> Dict[str, Any]:
-    org = require_context_value(context, "org", "organization or collection URL")
+    org = base_url_override or require_context_value(context, "org", "organization or collection URL")
     pat = require_context_value(context, "pat", "personal access token")
     url = build_rest_url(org, path, project=project, query=query, api_version=api_version)
 

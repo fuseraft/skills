@@ -330,17 +330,29 @@ Expected behavior:
 - queue a run
 - return the run ID, pipeline ID, initial state, and URL
 
-## Recommended implementation order
-Start with this sequence:
-1. `scripts/check-ado-prereqs`
-2. `scripts/show-ado-context`
-3. `scripts/work-item-get`
-4. `scripts/work-item-query`
-5. `scripts/pr-list`
-6. `scripts/pipeline-runs`
-7. `scripts/pipeline-run-queue`
+## Implementation status
 
-This order establishes the shared setup contract first, then adds one useful read path per supported area before write operations.
+Implemented so far (see "Implemented write support" and "Implemented additional read support" below for detail):
+- `scripts/check-ado-prereqs.py`
+- `scripts/show-ado-context.py`
+- `scripts/work-item-get.py`
+- `scripts/work-item-query.py`
+- `scripts/work-item-comment.py`
+- `scripts/work-item-create.py`
+- `scripts/work-item-update.py`
+- `scripts/pr-list.py`
+- `scripts/pr-get.py`
+- `scripts/pr-comment.py`
+- `scripts/repo-list.py`
+- `scripts/code-search.py`
+
+Not yet implemented (still just proposed in this document):
+- `scripts/work-item-link` — work item relationship creation
+- `scripts/pipeline-list` — pipeline listing (pipeline work is currently deprioritized)
+- `scripts/pipeline-run-queue` — queueing pipeline runs (pipeline work is currently deprioritized)
+- work item and PR attachment scripts (`work-item-attach`, `pr-attach`) — not yet started
+
+`scripts/pipeline-runs.py` is implemented and supports listing recent pipeline runs, but the rest of the pipeline surface remains on hold per current project priorities.
 
 ## Implemented write support
 
@@ -390,4 +402,38 @@ Example:
 
 ```powershell
 python scripts/pr-comment.py --backend rest --repo MyRepo --id 123 --comment "Please add a null check here."
+```
+
+## Implemented additional read support
+
+This skill also includes:
+- `scripts/repo-list.py` for listing Azure DevOps Git repositories through REST
+- `scripts/code-search.py` for searching code across repositories through the Azure DevOps Code Search REST API
+
+`repo-list.py` supports:
+- `--all-projects` to list repositories across the whole organization or collection instead of a single project
+- `--include-links` to include the `_links` block for each repository
+
+Example:
+
+```powershell
+python scripts/repo-list.py --backend rest --output table
+python scripts/repo-list.py --backend rest --all-projects --output json
+```
+
+`code-search.py` supports:
+- `--text <query>` (required), e.g. `myFunction` or `ext:cs myFunction`
+- repeated `--repo <name>` to limit results to one or more repositories
+- repeated `--path <path>` to limit results to a repository-relative path prefix
+- repeated `--branch <name>` to limit results to a branch
+- repeated `--extension <ext>` to limit results to a file extension
+- `--top <count>` and `--skip <count>` for paging
+- `--include-facets` to include facet counts in the response
+
+Note: this requires the Code Search extension/feature to be installed and enabled for the organization or collection. On Azure DevOps Services (cloud) the search API is hosted on a dedicated `almsearch.dev.azure.com` host; the skill resolves this automatically. On Azure DevOps Server / on-prem collections the same collection host is used.
+
+Example:
+
+```powershell
+python scripts/code-search.py --backend rest --text "ext:cs myFunction" --repo MyRepo --output table
 ```
