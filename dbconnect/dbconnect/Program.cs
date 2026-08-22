@@ -3,6 +3,7 @@ using System.Data.Common;
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Microsoft.Data.SqlClient;
 using Oracle.ManagedDataAccess.Client;
 
@@ -30,6 +31,15 @@ var oracleOption = new Option<bool>(
     name: "--oracle",
     description: "Connect to an Oracle database using Kerberos.");
 
+var maxRowsOption = new Option<int>(
+    name: "--max-rows",
+    description: "Maximum rows to print to the console (default 200). Does not limit --output CSV exports.",
+    getDefaultValue: () => 200);
+
+var allowWriteOption = new Option<bool>(
+    name: "--allow-write",
+    description: "Allow INSERT/UPDATE/DELETE/MERGE/DDL statements to run. Without this flag, write statements are blocked.");
+
 var rootCommand = new RootCommand("Connect to a database and execute SQL.");
 rootCommand.AddOption(connectionOption);
 rootCommand.AddOption(useOption);
@@ -37,6 +47,8 @@ rootCommand.AddOption(listOption);
 rootCommand.AddOption(sqlOption);
 rootCommand.AddOption(outputOption);
 rootCommand.AddOption(oracleOption);
+rootCommand.AddOption(maxRowsOption);
+rootCommand.AddOption(allowWriteOption);
 
 rootCommand.SetHandler(async context =>
 {
@@ -47,6 +59,8 @@ rootCommand.SetHandler(async context =>
     var sqlInput = parseResult.GetValueForOption(sqlOption);
     var outputPath = parseResult.GetValueForOption(outputOption);
     var useOracle = parseResult.GetValueForOption(oracleOption);
+    var maxRows = parseResult.GetValueForOption(maxRowsOption);
+    var allowWrite = parseResult.GetValueForOption(allowWriteOption);
 
     try
     {
@@ -81,8 +95,13 @@ rootCommand.SetHandler(async context =>
         }
 
         var sqlText = await ResolveSqlTextAsync(sqlInput);
-        var executionExitCode = await ExecuteAsync(selectedConnection.ConnectionString, sqlText, outputPath, selectedConnection.UseOracle);
+        var executionExitCode = await ExecuteAsync(selectedConnection.ConnectionString, sqlText, outputPath, selectedConnection.UseOracle, maxRows, allowWrite);
         context.ExitCode = executionExitCode;
+    }
+    catch (WriteBlockedException ex)
+    {
+        Console.Error.WriteLine($"Write blocked: {ex.Message}");
+        context.ExitCode = 7;
     }
     catch (ArgumentException ex)
     {
@@ -273,7 +292,7 @@ static JsonSerializerOptions JsonOptions() => new()
     PropertyNameCaseInsensitive = true
 };
 
-static async Task<int> ExecuteAsync(string connectionString, string sqlText, string? outputPath, bool useOracle)
+static async Task<int> ExecuteAsync(string connectionString, string sqlText, string? outputPath, bool useOracle, int maxRows, bool allowWrite)
 {
     if (string.IsNullOrWhiteSpace(sqlText))
     {
@@ -285,39 +304,126 @@ static async Task<int> ExecuteAsync(string connectionString, string sqlText, str
         throw new ArgumentException("The output path contains invalid characters.", nameof(outputPath));
     }
 
+    if (maxRows <= 0)
+    {
+        throw new ArgumentException("--max-rows must be a positive integer.", nameof(maxRows));
+    }
+
+    var batches = (useOracle ? new List<string> { sqlText } : SplitSqlServerBatches(sqlText))
+        .Where(batch => !string.IsNullOrWhiteSpace(batch))
+        .ToList();
+
+    if (batches.Count == 0)
+    {
+        throw new ArgumentException("SQL text cannot be empty.", nameof(sqlText));
+    }
+
+    if (!allowWrite)
+    {
+        foreach (var batch in batches)
+        {
+            if (TryFindWriteKeyword(batch, out var keyword))
+            {
+                throw new WriteBlockedException(
+                    $"Statement contains a write operation ('{keyword}') and --allow-write was not specified.");
+            }
+        }
+    }
+
+    var writingToFile = !string.IsNullOrWhiteSpace(outputPath);
+    var readLimit = writingToFile ? int.MaxValue : maxRows;
+
     using var connection = useOracle
         ? CreateOracleConnection(connectionString)
         : CreateSqlServerConnection(connectionString);
 
     await connection.OpenAsync();
 
-    using var command = connection.CreateCommand();
-    command.CommandText = sqlText;
+    List<string[]>? lastRows = null;
+    var lastTruncated = false;
 
-    using var reader = await command.ExecuteReaderAsync();
-
-    if (reader.FieldCount > 0)
+    foreach (var batch in batches)
     {
-        var rows = await ReadRowsAsync(reader);
+        using var command = connection.CreateCommand();
+        command.CommandText = batch;
 
-        if (!string.IsNullOrWhiteSpace(outputPath))
+        using var reader = await command.ExecuteReaderAsync();
+
+        if (reader.FieldCount > 0)
         {
-            await WriteCsvAsync(outputPath, rows);
-            Console.WriteLine($"Wrote {Math.Max(rows.Count - 1, 0)} row(s) to {outputPath}.");
-            return 0;
+            (lastRows, lastTruncated) = await ReadRowsAsync(reader, readLimit);
         }
+        else
+        {
+            lastRows = null;
+            var affectedRows = reader.RecordsAffected;
+            Console.WriteLine(affectedRows >= 0
+                ? $"Command completed successfully. {affectedRows} row(s) affected."
+                : "Command completed successfully.");
+        }
+    }
 
-        WriteConsoleTable(rows);
+    if (batches.Count > 1)
+    {
+        Console.WriteLine($"Executed {batches.Count} batch(es).");
+    }
+
+    if (lastRows is null)
+    {
         return 0;
     }
 
-    var affectedRows = reader.RecordsAffected;
-    Console.WriteLine(affectedRows >= 0
-        ? $"Command completed successfully. {affectedRows} row(s) affected."
-        : "Command completed successfully.");
+    if (writingToFile)
+    {
+        await WriteCsvAsync(outputPath!, lastRows);
+        Console.WriteLine($"Wrote {Math.Max(lastRows.Count - 1, 0)} row(s) to {outputPath}.");
+        return 0;
+    }
+
+    WriteConsoleTable(lastRows);
+    if (lastTruncated)
+    {
+        Console.WriteLine($"... output truncated at {maxRows} row(s). Use --max-rows to raise the limit or --output to export all results.");
+    }
 
     return 0;
 }
+
+static bool TryFindWriteKeyword(string sql, out string keyword)
+{
+    string[] writeKeywords =
+    [
+        "INSERT", "UPDATE", "DELETE", "MERGE", "DROP", "ALTER", "CREATE",
+        "TRUNCATE", "GRANT", "REVOKE", "EXEC", "EXECUTE"
+    ];
+
+    var stripped = StripCommentsAndStringLiterals(sql);
+
+    foreach (var candidate in writeKeywords)
+    {
+        if (Regex.IsMatch(stripped, $@"(?<![A-Za-z0-9_]){candidate}(?![A-Za-z0-9_])", RegexOptions.IgnoreCase))
+        {
+            keyword = candidate;
+            return true;
+        }
+    }
+
+    keyword = string.Empty;
+    return false;
+}
+
+static string StripCommentsAndStringLiterals(string sql)
+{
+    var noBlockComments = Regex.Replace(sql, @"/\*.*?\*/", " ", RegexOptions.Singleline);
+    var noLineComments = Regex.Replace(noBlockComments, @"--[^\r\n]*", " ");
+    var noStrings = Regex.Replace(noLineComments, @"'(?:[^']|'')*'", " ");
+    var noBracketedIdentifiers = Regex.Replace(noStrings, @"\[[^\]]*\]", " ");
+    var noQuotedIdentifiers = Regex.Replace(noBracketedIdentifiers, "\"[^\"]*\"", " ");
+    return noQuotedIdentifiers;
+}
+
+static List<string> SplitSqlServerBatches(string sqlText) =>
+    [.. Regex.Split(sqlText, @"^[ \t]*GO[ \t]*$", RegexOptions.IgnoreCase | RegexOptions.Multiline)];
 
 static bool ContainsInvalidPathChars(string path) => path.IndexOfAny(Path.GetInvalidPathChars()) >= 0;
 
@@ -329,7 +435,7 @@ static DbConnection CreateOracleConnection(string connectionString)
     return new OracleConnection(connectionString);
 }
 
-static async Task<List<string[]>> ReadRowsAsync(DbDataReader reader)
+static async Task<(List<string[]> Rows, bool Truncated)> ReadRowsAsync(DbDataReader reader, int maxRows)
 {
     var rows = new List<string[]>();
     var header = new string[reader.FieldCount];
@@ -340,8 +446,17 @@ static async Task<List<string[]>> ReadRowsAsync(DbDataReader reader)
 
     rows.Add(header);
 
+    var dataRowCount = 0;
+    var truncated = false;
+
     while (await reader.ReadAsync())
     {
+        if (dataRowCount >= maxRows)
+        {
+            truncated = true;
+            break;
+        }
+
         var values = new string[reader.FieldCount];
         for (var i = 0; i < reader.FieldCount; i++)
         {
@@ -351,9 +466,10 @@ static async Task<List<string[]>> ReadRowsAsync(DbDataReader reader)
         }
 
         rows.Add(values);
+        dataRowCount++;
     }
 
-    return rows;
+    return (rows, truncated);
 }
 
 static async Task WriteCsvAsync(string outputPath, IReadOnlyList<string[]> rows)
@@ -388,6 +504,8 @@ static void WriteConsoleTable(IReadOnlyList<string[]> rows)
         Console.WriteLine(string.Join('\t', row));
     }
 }
+
+sealed class WriteBlockedException(string message) : Exception(message);
 
 sealed record ResolvedConnection(string ConnectionString, bool UseOracle);
 
