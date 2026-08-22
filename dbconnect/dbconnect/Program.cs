@@ -40,6 +40,15 @@ var allowWriteOption = new Option<bool>(
     name: "--allow-write",
     description: "Allow INSERT/UPDATE/DELETE/MERGE/DDL statements to run. Without this flag, write statements are blocked.");
 
+var formatOption = new Option<string>(
+    name: "--format",
+    description: "Output format: 'table' (default) or 'json'. Applies to console output and to --output when writing to a file.",
+    getDefaultValue: () => "table");
+
+var timeoutOption = new Option<int?>(
+    name: "--timeout",
+    description: "Command timeout in seconds. 0 means no timeout. Omit to use the database driver's own default.");
+
 var rootCommand = new RootCommand("Connect to a database and execute SQL.");
 rootCommand.AddOption(connectionOption);
 rootCommand.AddOption(useOption);
@@ -49,6 +58,8 @@ rootCommand.AddOption(outputOption);
 rootCommand.AddOption(oracleOption);
 rootCommand.AddOption(maxRowsOption);
 rootCommand.AddOption(allowWriteOption);
+rootCommand.AddOption(formatOption);
+rootCommand.AddOption(timeoutOption);
 
 rootCommand.SetHandler(async context =>
 {
@@ -61,6 +72,8 @@ rootCommand.SetHandler(async context =>
     var useOracle = parseResult.GetValueForOption(oracleOption);
     var maxRows = parseResult.GetValueForOption(maxRowsOption);
     var allowWrite = parseResult.GetValueForOption(allowWriteOption);
+    var format = (parseResult.GetValueForOption(formatOption) ?? "table").Trim().ToLowerInvariant();
+    var commandTimeoutSeconds = parseResult.GetValueForOption(timeoutOption);
 
     try
     {
@@ -95,7 +108,7 @@ rootCommand.SetHandler(async context =>
         }
 
         var sqlText = await ResolveSqlTextAsync(sqlInput);
-        var executionExitCode = await ExecuteAsync(selectedConnection.ConnectionString, sqlText, outputPath, selectedConnection.UseOracle, maxRows, allowWrite);
+        var executionExitCode = await ExecuteAsync(selectedConnection.ConnectionString, sqlText, outputPath, selectedConnection.UseOracle, maxRows, allowWrite, format, commandTimeoutSeconds);
         context.ExitCode = executionExitCode;
     }
     catch (WriteBlockedException ex)
@@ -292,7 +305,7 @@ static JsonSerializerOptions JsonOptions() => new()
     PropertyNameCaseInsensitive = true
 };
 
-static async Task<int> ExecuteAsync(string connectionString, string sqlText, string? outputPath, bool useOracle, int maxRows, bool allowWrite)
+static async Task<int> ExecuteAsync(string connectionString, string sqlText, string? outputPath, bool useOracle, int maxRows, bool allowWrite, string format, int? commandTimeoutSeconds)
 {
     if (string.IsNullOrWhiteSpace(sqlText))
     {
@@ -307,6 +320,16 @@ static async Task<int> ExecuteAsync(string connectionString, string sqlText, str
     if (maxRows <= 0)
     {
         throw new ArgumentException("--max-rows must be a positive integer.", nameof(maxRows));
+    }
+
+    if (format is not ("table" or "json"))
+    {
+        throw new ArgumentException("--format must be 'table' or 'json'.", nameof(format));
+    }
+
+    if (commandTimeoutSeconds is < 0)
+    {
+        throw new ArgumentException("--timeout must be zero or a positive integer.", nameof(commandTimeoutSeconds));
     }
 
     var batches = (useOracle ? new List<string> { sqlText } : SplitSqlServerBatches(sqlText))
@@ -339,23 +362,26 @@ static async Task<int> ExecuteAsync(string connectionString, string sqlText, str
 
     await connection.OpenAsync();
 
-    List<string[]>? lastRows = null;
-    var lastTruncated = false;
+    ResultSet? lastResultSet = null;
 
     foreach (var batch in batches)
     {
         using var command = connection.CreateCommand();
         command.CommandText = batch;
+        if (commandTimeoutSeconds.HasValue)
+        {
+            command.CommandTimeout = commandTimeoutSeconds.Value;
+        }
 
         using var reader = await command.ExecuteReaderAsync();
 
         if (reader.FieldCount > 0)
         {
-            (lastRows, lastTruncated) = await ReadRowsAsync(reader, readLimit);
+            lastResultSet = await ReadResultSetAsync(reader, readLimit);
         }
         else
         {
-            lastRows = null;
+            lastResultSet = null;
             var affectedRows = reader.RecordsAffected;
             Console.WriteLine(affectedRows >= 0
                 ? $"Command completed successfully. {affectedRows} row(s) affected."
@@ -368,20 +394,43 @@ static async Task<int> ExecuteAsync(string connectionString, string sqlText, str
         Console.WriteLine($"Executed {batches.Count} batch(es).");
     }
 
-    if (lastRows is null)
+    if (lastResultSet is null)
     {
         return 0;
     }
+
+    if (format == "json")
+    {
+        var payload = new
+        {
+            rowCount = lastResultSet.Rows.Count,
+            truncated = lastResultSet.Truncated,
+            rows = lastResultSet.Rows.Select(row => ToRowObject(lastResultSet.Columns, row)).ToList()
+        };
+        var json = JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = true });
+
+        if (writingToFile)
+        {
+            await File.WriteAllTextAsync(outputPath!, json, new UTF8Encoding(false));
+            Console.WriteLine($"Wrote {lastResultSet.Rows.Count} row(s) to {outputPath}.");
+            return 0;
+        }
+
+        Console.WriteLine(json);
+        return 0;
+    }
+
+    var stringRows = ToStringRows(lastResultSet);
 
     if (writingToFile)
     {
-        await WriteCsvAsync(outputPath!, lastRows);
-        Console.WriteLine($"Wrote {Math.Max(lastRows.Count - 1, 0)} row(s) to {outputPath}.");
+        await WriteCsvAsync(outputPath!, stringRows);
+        Console.WriteLine($"Wrote {Math.Max(stringRows.Count - 1, 0)} row(s) to {outputPath}.");
         return 0;
     }
 
-    WriteConsoleTable(lastRows);
-    if (lastTruncated)
+    WriteConsoleTable(stringRows);
+    if (lastResultSet.Truncated)
     {
         Console.WriteLine($"... output truncated at {maxRows} row(s). Use --max-rows to raise the limit or --output to export all results.");
     }
@@ -435,41 +484,66 @@ static DbConnection CreateOracleConnection(string connectionString)
     return new OracleConnection(connectionString);
 }
 
-static async Task<(List<string[]> Rows, bool Truncated)> ReadRowsAsync(DbDataReader reader, int maxRows)
+static async Task<ResultSet> ReadResultSetAsync(DbDataReader reader, int maxRows)
 {
-    var rows = new List<string[]>();
-    var header = new string[reader.FieldCount];
+    var columns = new string[reader.FieldCount];
     for (var i = 0; i < reader.FieldCount; i++)
     {
-        header[i] = reader.GetName(i);
+        columns[i] = reader.GetName(i);
     }
 
-    rows.Add(header);
-
-    var dataRowCount = 0;
+    var rows = new List<object?[]>();
     var truncated = false;
 
     while (await reader.ReadAsync())
     {
-        if (dataRowCount >= maxRows)
+        if (rows.Count >= maxRows)
         {
             truncated = true;
             break;
         }
 
-        var values = new string[reader.FieldCount];
+        var values = new object?[reader.FieldCount];
         for (var i = 0; i < reader.FieldCount; i++)
         {
-            values[i] = reader.IsDBNull(i)
-                ? string.Empty
-                : Convert.ToString(reader.GetValue(i), CultureInfo.InvariantCulture) ?? string.Empty;
+            values[i] = reader.IsDBNull(i) ? null : reader.GetValue(i);
         }
 
         rows.Add(values);
-        dataRowCount++;
     }
 
-    return (rows, truncated);
+    return new ResultSet(columns, rows, truncated);
+}
+
+static Dictionary<string, object?> ToRowObject(string[] columns, object?[] values)
+{
+    var row = new Dictionary<string, object?>(columns.Length);
+    for (var i = 0; i < columns.Length; i++)
+    {
+        row[columns[i]] = values[i];
+    }
+
+    return row;
+}
+
+static List<string[]> ToStringRows(ResultSet resultSet)
+{
+    var rows = new List<string[]>(resultSet.Rows.Count + 1) { resultSet.Columns };
+
+    foreach (var row in resultSet.Rows)
+    {
+        var values = new string[row.Length];
+        for (var i = 0; i < row.Length; i++)
+        {
+            values[i] = row[i] is null
+                ? string.Empty
+                : Convert.ToString(row[i], CultureInfo.InvariantCulture) ?? string.Empty;
+        }
+
+        rows.Add(values);
+    }
+
+    return rows;
 }
 
 static async Task WriteCsvAsync(string outputPath, IReadOnlyList<string[]> rows)
@@ -506,6 +580,8 @@ static void WriteConsoleTable(IReadOnlyList<string[]> rows)
 }
 
 sealed class WriteBlockedException(string message) : Exception(message);
+
+sealed record ResultSet(string[] Columns, List<object?[]> Rows, bool Truncated);
 
 sealed record ResolvedConnection(string ConnectionString, bool UseOracle);
 
