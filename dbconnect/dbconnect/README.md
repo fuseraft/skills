@@ -20,8 +20,10 @@ PS> .\build.ps1
 | `--use` | Specify a named connection to use. |
 | `--list` | List available connections. |
 | `--sql "sql statements;"` | SQL text to execute. |
-| `--sql <file_name>` | Execute SQL from a file. |
-| `--output <file_name>` | Write results to a CSV file. |
+| `--sql <file_name>` | Execute SQL from a file. SQL Server input is split on lines containing only `GO` and run as separate batches. |
+| `--output <file_name>` | Write results to a CSV file. CSV exports are never truncated by `--max-rows`. |
+| `--max-rows <n>` | Cap console table output at `n` rows (default 200). Does not affect `--output` CSV exports. |
+| `--allow-write` | Permit INSERT/UPDATE/DELETE/MERGE/DDL statements. Without it, dbconnect blocks write statements before opening a connection. |
 
 ## Connections
 

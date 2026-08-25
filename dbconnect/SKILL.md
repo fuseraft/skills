@@ -17,6 +17,7 @@ description: Use dbconnect.exe to validate connectivity, inspect schema, run SQL
 - Either `--conn` string or named connection for `--use`
 - SQL text or path to `.sql` file
 - Optional CSV output path
+- Whether the SQL writes data (INSERT/UPDATE/DELETE/MERGE/DDL/EXEC) — if so, confirm intent with the user before adding `--allow-write`
 
 ## Procedure
 1. Read `references/dbconnect-usage.md` and `references/dbconnect-examples.md`.
@@ -24,14 +25,14 @@ description: Use dbconnect.exe to validate connectivity, inspect schema, run SQL
 3. If the user wants saved connections, run `scripts\dbconnect-list.bat`.
 4. For a connectivity check, run a trivial query like `SELECT 1` using the right wrapper.
 5. For schema inspection, use the schema query pattern in `references/dbconnect-examples.md`.
-6. For migrations or other file-based SQL, execute the `.sql` file path through the wrapper.
-7. If results must be preserved, pass an output CSV path.
+6. For migrations or other file-based SQL, execute the `.sql` file path through the wrapper. SQL Server files may contain `GO` batch separators; dbconnect splits and runs them as separate batches automatically.
+7. If results must be preserved, pass an output CSV path — this also bypasses the console `--max-rows` cap. For large ad hoc queries without `--output`, either add `--max-rows <n>` or expect console output truncated at 200 rows by default.
 8. Return the exact command run, summarize results, and call out any prerequisite failures.
 
 ## Rules
 - Prefer wrapper scripts in `scripts/`; do not invoke the exe manually unless troubleshooting.
 - Do not invent connection strings, named connections, or schema names.
-- Treat destructive SQL as dangerous; require explicit user intent before running it.
+- dbconnect blocks INSERT/UPDATE/DELETE/MERGE/DROP/ALTER/CREATE/TRUNCATE/GRANT/REVOKE/EXEC/EXECUTE statements by default (exit code 7). Confirm explicit user intent before re-running with `--allow-write` — this is a text-based guard, not a parser, so do not treat its absence of a block as proof the SQL is safe.
 - If authentication or network access fails, report the exact stderr and stop.
 - Keep secrets out of logs and responses when echoing commands.
 
