@@ -35,6 +35,24 @@ For detailed usage, see:
 - [dbconnect CLI README](dbconnect/dbconnect/README.md) - Full CLI documentation
 - [dbconnect SKILL.md](dbconnect/SKILL.md) - Skill usage instructions
 
+### build-docx Skill
+
+Generates a DOCX file from structured content, a template, or a description — detects the project stack, picks the right library (`python-docx`, `docx` npm, or `DocumentFormat.OpenXml`/`DocX`), and writes a self-contained builder script.
+
+**Location:** `build-docx/`
+
+### sandbox-test Skill
+
+Builds and runs a throwaway harness in the project's own stack to verify logic before modifying production code. Supports .NET, Go, Rust, Python, TypeScript, Node.js, and Java.
+
+**Location:** `sandbox-test/`
+
+### commit Skill
+
+Stages and commits changes using the conventional commit format (`type: description`, imperative mood, staged files named explicitly — never `git add -A`).
+
+**Location:** `commit/`
+
 ## Development
 
 Each skill follows the structure:
