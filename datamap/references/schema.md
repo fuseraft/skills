@@ -98,10 +98,31 @@ the user's original spec calls them out as examples ("Database, API, etc."). A v
 these sets is a **warning**, not a validation error, from `Test-DataMapJsonl.ps1`.
 
 Reasonable reasons to go outside the set: a message queue (`src_type: "Queue"`), a
-config/environment-variable source, a cache (Redis) as either side. If you do, keep the
-value consistent across the whole datamap (don't mix `"Queue"` and `"MessageQueue"` for the
-same concept in one file) and consider naming the addition in your final report to the user
-so they can decide whether to fold it into a future schema revision.
+config/environment-variable source, a cache (Redis) as either side, or **`"Runtime"`** for a
+value the application computes itself rather than reads from anywhere external — a
+`DateTime.UtcNow`/`Guid.NewGuid()` timestamp or correlation ID, a hardcoded constant, a
+counter. If you do, keep the value consistent across the whole datamap (don't mix `"Queue"`
+and `"MessageQueue"` for the same concept in one file) and consider naming the addition in
+your final report to the user so they can decide whether to fold it into a future schema
+revision.
+
+**`Runtime` as `src_type`** is the answer to a specific recurring judgment call: a destination
+column or API payload field is populated from something computed in-process (a watermark
+timestamp being saved, an audit/load-time column, a generated ID) rather than read from a
+source table, file, or API response. Two resolutions are both defensible:
+- **Map it** with `src_type: "Runtime"`, `src_name` naming the process/component that computes
+  it (e.g. `"SalesSyncJob process"`), `src_tbl` naming the expression (e.g.
+  `"DateTime.UtcNow (runStartedUtc)"`), `src_col: "N/A"` — this surfaces the row in the CSV
+  for governance/completeness, at the cost of one `Test-DataMapJsonl.ps1` warning per row
+  (`src_type` outside the recommended set).
+- **Don't map it**, and call it out in your Step 6 report instead ("`SalesFact.LoadedUtc` is a
+  computed timestamp, not sourced from any table — not mapped as a row").
+
+Prefer mapping it with `Runtime` when the value's *destination* is itself governance-relevant
+(it lands in a table/file/API a compliance reviewer cares about) - the CSV is then a complete
+inventory of everything that reaches that destination, computed or not. Prefer leaving it
+unmapped when the computed value is purely internal bookkeeping with no interesting
+destination of its own. Either way, be consistent within one datamap run.
 
 ## Worked shape (all four flow directions)
 

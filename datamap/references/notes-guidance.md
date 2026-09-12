@@ -37,6 +37,11 @@ obvious?
   that comes from Key Vault, App Configuration, or an environment variable rather than a
   literal in source — say what's known (the config key) and what isn't (the actual runtime
   value).
+- **Computed values mapped with `src_type: "Runtime"`** — if you mapped a row this way (see
+  `references/schema.md` — "Extending the type sets"), the note should name the exact
+  expression that produces the value and, if the same value also gets consumed elsewhere
+  (e.g. a watermark timestamp that both lands in a table *and* gets POSTed back to an API),
+  cross-reference that other flow so a reader doesn't have to re-derive the connection.
 - **`*` justification** — any row using the `*` sentinel for a column field must explain why
   here (see `references/schema.md` — "Column granularity"): `SELECT *` used, a dynamically
   built column list, or a deliberate collapse of a wide 1:1 mapping.
