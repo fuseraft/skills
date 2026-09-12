@@ -53,6 +53,17 @@ Stages and commits changes using the conventional commit format (`type: descript
 
 **Location:** `commit/`
 
+### datamap Skill
+
+Maps data flow through a C# codebase from source (executed SQL via ADO.NET/Dapper, API calls, files) to destination (database tables, API endpoints, files on disk/SFTP/SharePoint, email). Produces a validated JSONL data map (structure first, then annotated with transformation notes) and converts it to a deterministic CSV. Entity Framework is out of scope as a SQL source since its generated SQL isn't statically visible.
+
+**Location:** `datamap/`
+
+**Structure:**
+- `SKILL.md` - The four-pass workflow (generate → validate → annotate → validate → convert)
+- `references/` - Schema conventions, C# detection patterns (ADO.NET/Dapper/HttpClient/EPPlus/SSH.NET/Graph/etc.), notes-writing guidance, and a full worked example
+- `scripts/` - PowerShell 5.1-compatible scripts to append, validate, annotate, and convert the datamap without hand-editing JSONL
+
 ## Development
 
 Each skill follows the structure:
