@@ -27,7 +27,7 @@ Do **not** use this skill for:
 Run the detection script to identify the project language and available DOCX libraries:
 
 ```bash
-python3 scripts/detect_docx_stack.py <project-root>
+pwsh -File scripts/detect_docx_stack.ps1 <project-root>
 ```
 
 Returns JSON with `language`, `available_libraries`, and `recommended`.
