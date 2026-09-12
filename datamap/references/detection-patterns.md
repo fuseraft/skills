@@ -23,8 +23,12 @@ Signatures:
 ```bash
 rg -tcs 'SqlCommand|OleDbCommand|OdbcCommand|IDbCommand\b|DbCommand\b' -n
 rg -tcs 'CommandText\s*=' -n
-rg -tcs '\.ExecuteReader\(|\.ExecuteNonQuery\(|\.ExecuteScalar\(' -n
+rg -tcs '\.ExecuteReader(Async)?\(|\.ExecuteNonQuery(Async)?\(|\.ExecuteScalar(Async)?\(' -n
 ```
+
+Match the `Async`-suffixed overloads too (`ExecuteReaderAsync`, `ExecuteNonQueryAsync`,
+`ExecuteScalarAsync`) — they're the more common form in current code, and `\.ExecuteReader\(`
+alone does **not** match `.ExecuteReaderAsync(` (no shared trailing `(`).
 
 Once you have `CommandText`, classify the statement yourself:
 - `SELECT ... FROM <t1> [JOIN <t2> ...]` → each of `t1`, `t2`, ... is a **source** table
@@ -110,10 +114,18 @@ rg -tcs 'ConnectionStrings__' -n   # env-var-style override (double underscore =
 
 ```bash
 rg -tcs '\bHttpClient\b|IHttpClientFactory|\.GetAsync\(|\.PostAsync\(|\.PutAsync\(|\.PatchAsync\(|\.DeleteAsync\(|\.SendAsync\(' -n
+rg -tcs '\.(Get|Post|Put|Patch|Delete)FromJsonAsync\b|\.(Post|Put|Patch)AsJsonAsync\b' -n   # System.Net.Http.Json extensions
 rg -tcs '\bRestClient\b|RestRequest' -n           # RestSharp
 rg -tcs '\.WithUrl\(|GetJsonAsync|PostJsonAsync' -n   # Flurl
 rg -tcs '\[Get\(|\[Post\(|\[Put\(|\[Delete\(' -n      # Refit interface methods
 ```
+
+The `System.Net.Http.Json` extension methods (`GetFromJsonAsync`, `PostAsJsonAsync`, etc.)
+are at least as common as the bare verb calls in current code and are **not** matched by the
+first line above (`.PostAsJsonAsync(` doesn't contain `.PostAsync(` as a substring) - always
+run the second line too, and don't rely on the bare-verb pattern alone to rule out a JSON API
+call. The `\bHttpClient\b` hit on the class itself still anchors you to the right file either
+way, which is why "read the surrounding method" (not just the matched line) matters here.
 
 `BaseAddress` (set directly on an `HttpClient`, or via `services.AddHttpClient("name", c => c.BaseAddress = ...)`
 in DI startup code) gives you `src_name`/`dst_name`; the path passed to the verb call
