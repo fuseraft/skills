@@ -1,11 +1,11 @@
 ---
 name: sandbox-test
-description: "Test a code change in an isolated throwaway harness before touching production source files. Use this skill whenever a logic fix or behavioral change is uncertain, involves non-obvious side effects, or requires iterating on behavior before committing. Trigger when: debugging a defect, verifying a hypothesis, testing edge-case handling, or any time confidence in a change must be established mechanically before applying it to real code."
+description: "Test a .NET code change in an isolated throwaway console harness before touching production source files. Use this skill whenever a logic fix or behavioral change in a .NET/C# codebase is uncertain, involves non-obvious side effects, or requires iterating on behavior before committing. Trigger when: debugging a defect, verifying a hypothesis, testing edge-case handling, or any time confidence in a change must be established mechanically before applying it to real code."
 ---
 
 # Sandbox Test
 
-Build and run a throwaway harness in the same stack to verify logic before modifying production code.
+Build and run a throwaway .NET console harness to verify logic before modifying production code. .NET-specific by design — see "When to Use" below for what to do on a non-.NET codebase.
 
 ## Purpose
 
@@ -14,28 +14,31 @@ A code change without a prior run is a claim, not a fact. This skill turns every
 ## When to Use
 
 Use this skill when:
+- The project is .NET (C#) — check for `*.csproj`, `*.sln`, `global.json`, or `Directory.Build.props`
 - The correct behavior of a fix or new logic is uncertain or non-obvious
 - A change involves branching logic, state mutation, or collection handling
 - The goal is to *understand* current behavior before altering it
 - More than one approach is plausible and a quick experiment can settle it
 
-Do **not** use this skill for trivial edits: renames, comment updates, whitespace changes, or one-liner fixes with obvious outcomes.
+Do **not** use this skill for:
+- Trivial edits: renames, comment updates, whitespace changes, or one-liner fixes with obvious outcomes
+- Non-.NET codebases — this skill's scaffold, build, and run commands are .NET-specific; a similar throwaway-harness approach can still be valuable in another stack, but it isn't what this skill automates
 
 ## Workflow
 
 Follow these steps in order. Do not modify production source files until Step 5 (Apply) is reached.
 
-### Step 1: Detect the Stack
+### Step 1: Confirm It's a .NET Project
 
 Run the `detect_stack` script, passing the project root as the first argument:
 
 ```bash
-python3 scripts/detect_stack.py /path/to/project
+pwsh -File scripts/detect_stack.ps1 /path/to/project
 ```
 
-The script scans for marker files in priority order and returns a JSON object with `stack`, `display`, `markers`, `shell`, `temp_dir`, `scaffold`, `build`, `run`, `cleanup`, and `debug_idiom` fields — everything needed for Steps 2–4. Use these values directly rather than reconstructing them from `references/stack-patterns.md`.
+The script checks for `.NET` marker files and returns a JSON object with `stack`, `display`, `markers`, `shell`, `temp_dir`, `scaffold`, `build`, `run`, `cleanup`, and `debug_idiom` fields — everything needed for Steps 2–4. Use these values directly rather than reconstructing them from `references/stack-patterns.md`.
 
-If the script returns `"stack": "unknown"`, read `references/stack-patterns.md` and identify the stack manually from the marker table.
+If the script returns `"stack": "unknown"`, this isn't a .NET project (or the markers aren't at the path given) — this skill doesn't apply; stop here rather than improvising a harness in another language.
 
 ### Step 2: Create the Harness
 
@@ -59,7 +62,6 @@ Prefer inlining the relevant logic over importing production code directly. The 
 Write the harness code. Insert a labeled debug line at every meaningful boundary — function entry, conditional branch, important value, collection size. Use the stack's idiomatic print/log mechanism:
 
 ```csharp
-// C# example
 Console.WriteLine($"[DBG] input={JsonSerializer.Serialize(input)}");
 var result = Compute(input);
 Console.WriteLine($"[DBG] result={result}");
@@ -75,9 +77,7 @@ More output is better than less at this stage — it is cheaper to ignore a line
 
 ### Step 4: Build and Run — Capture All Output
 
-Use the `build` and `run` commands from the `detect_stack` output. Run build first; if it succeeds, run the program. Redirect stderr into stdout (`2>&1` works on both bash and PowerShell) so debug lines and error output appear together in the captured result.
-
-If `build` is an empty string, skip directly to `run` — no separate build step is needed for that stack.
+Use the `build` and `run` commands from the `detect_stack` output (`dotnet build` and `dotnet run`). Run build first; if it succeeds, run the program. Redirect stderr into stdout (`2>&1` works on both bash and PowerShell) so debug lines and error output appear together in the captured result.
 
 If the build fails, fix compilation errors before addressing runtime behavior. Build errors are deterministic and faster to resolve; runtime behavior cannot be observed until the binary exists.
 
@@ -105,8 +105,8 @@ Then:
 
 ## References
 
-- `references/stack-patterns.md` — Detection markers, scaffold commands, build/run patterns, and debug idioms for each supported stack
+- `references/stack-patterns.md` — .NET detection markers, scaffold command, build/run pattern, and debug idiom
 
 ## Scripts
 
-- `scripts/detect_stack.py [path]` — Scans `path` (default: cwd) for stack markers and returns a JSON object with `stack`, `display`, `markers`, `shell`, `temp_dir`, `scaffold`, `build`, `run`, `cleanup`, and `debug_idiom` fields ready for use in Steps 2–4
+- `scripts/detect_stack.ps1 [path]` — Scans `path` (default: cwd) for .NET project markers (`*.csproj`, `*.sln`, `global.json`, `Directory.Build.props`) and returns a JSON object with `stack` (`"dotnet"` or `"unknown"`), `display`, `markers`, `shell`, `temp_dir`, `scaffold`, `build`, `run`, `cleanup`, and `debug_idiom` fields ready for use in Steps 2–4

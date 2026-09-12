@@ -50,13 +50,13 @@ Generates a DOCX file from structured content, a template, or a description — 
 **Structure:**
 - `SKILL.md` - The skill definition and procedure
 - `references/` - Pattern references per library (`python-docx`, `docx` npm, `DocumentFormat.OpenXml`)
-- `scripts/detect_docx_stack.py` - Stack detection helper
+- `scripts/detect_docx_stack.ps1` - Stack detection helper
 
 **Quick Start:**
 
 Detect the project's stack and recommended library:
-```bash
-python3 build-docx/scripts/detect_docx_stack.py <project-root>
+```powershell
+pwsh -File build-docx/scripts/detect_docx_stack.ps1 <project-root>
 ```
 
 For detailed usage, see:
@@ -64,26 +64,26 @@ For detailed usage, see:
 
 ### sandbox-test Skill
 
-Builds and runs a throwaway harness in the project's own stack to verify logic before modifying production code. Supports .NET, Go, Rust, Python, TypeScript, Node.js, and Java.
+Builds and runs a throwaway .NET console harness to verify logic before modifying production code. .NET-specific by design.
 
 **Location:** `sandbox-test/`
 
 **Key Features:**
-- Detect the project's stack and its scaffold/build/run/cleanup commands
-- Scaffold a minimal, disposable harness instead of touching production files
+- Detect a .NET project (`*.csproj`, `*.sln`, `global.json`, `Directory.Build.props`) and report its scaffold/build/run/cleanup commands
+- Scaffold a minimal, disposable `dotnet new console` harness instead of touching production files
 - Instrument with labeled `[DBG]` debug output at every meaningful boundary
 - Iterate up to 5 times before stopping to report findings and ask for guidance
 
 **Structure:**
 - `SKILL.md` - The skill definition and procedure
-- `references/stack-patterns.md` - Detection markers, scaffold/build/run/debug patterns per stack
-- `scripts/detect_stack.py` - Stack detection helper
+- `references/stack-patterns.md` - .NET detection markers, scaffold/build/run/debug patterns
+- `scripts/detect_stack.ps1` - .NET project detection helper
 
 **Quick Start:**
 
-Detect the project's stack:
-```bash
-python3 sandbox-test/scripts/detect_stack.py <project-root>
+Confirm the project is .NET and get its harness commands:
+```powershell
+pwsh -File sandbox-test/scripts/detect_stack.ps1 <project-root>
 ```
 
 For detailed usage, see:
