@@ -1,12 +1,46 @@
 # Detection Patterns (C#)
 
-Signatures and `rg` (ripgrep) commands for finding each source/destination category in a C#
-codebase. Run these from the repo root. Every command targets `*.cs` files; adjust the glob
-if the repo also has `.cshtml`/`.razor` files worth scanning (rare for data-flow code).
+Regex patterns for finding each source/destination category in a C# codebase, plus the
+signatures that motivate them. These are patterns, not tool invocations — run each one with
+whichever content-search capability is actually available in the current session:
 
-Read a hit's surrounding method, not just the matched line, before deciding source vs.
-destination and before writing a row — the signature tells you *what kind* of flow it is,
-the surrounding code tells you *which direction* and *which table/endpoint/file*.
+- **`search_content`** (fuseraft's built-in tool) — the default, reach for it first. Pure
+  .NET, no external binary, works identically on Windows/Linux/macOS with zero install:
+  `search_content(query: "<pattern>", directory: ".", filePattern: "*.cs")`.
+- **`rg`** (ripgrep), only if it's actually on `PATH` in this environment — check once with
+  `shell_which rg` (or the equivalent shell-availability check) before relying on it, never
+  assume it's installed. It is not bundled with Windows, and often isn't present even in a
+  plain Linux shell — a session's own interactive shell can have a convenience wrapper for
+  `rg` that a `shell_run` subprocess does not inherit, so "it worked when I typed `rg` once"
+  is not proof it's really there. When it is available: `rg -tcs "<pattern>" -n`, and several
+  patterns can be OR'd into one call to save round trips — a nice-to-have, never a
+  requirement, since every pattern below works identically through `search_content`.
+
+Patterns below are shown as bare regexes (target `*.cs`; adjust the file pattern if the repo
+also has `.cshtml`/`.razor` files worth scanning — rare for data-flow code). Read a hit's
+surrounding method, not just the matched line, before deciding source vs. destination and
+before writing a row — the signature tells you *what kind* of flow it is, the surrounding code
+tells you *which direction* and *which table/endpoint/file*.
+
+## File size guidance
+
+Below roughly 300 lines, read the whole file directly instead of relying on a pattern search to
+find the relevant lines first — a search can only find a pattern that's actually in the list
+below, and a short file is cheap to read in full regardless of whether anything matches.
+
+Above that, pattern search is still the entry point, but expand every hit to the file's
+containing **method or class**, not a handful of context lines. Enterprise data-access code is
+usually a few well-encapsulated methods even inside a large file, and reading the whole
+containing unit is what actually lets you classify source vs. destination correctly — a
+`SqlCommand` construction near the top of a 3,000-line file tells you nothing about which
+table or direction without the rest of that method.
+
+A large file is also where a missed pattern is most consequential, since there's no "just read
+the whole thing" safety net for it. As a second, looser pass over any file large enough to skip
+whole-file reading, search its `using` directives for the namespaces this file's signatures
+come from (`Microsoft.Data.SqlClient`, `System.Net.Http`, `OfficeOpenXml`, `Dapper`, etc.) — a
+hit there with no corresponding signature match downstream in the same file is a sign the
+verb-level patterns missed something, worth a closer manual look before moving on.
 
 ## SQL via ADO.NET
 
@@ -20,11 +54,10 @@ Signatures:
   the SQL text to confirm which
 - `.ExecuteScalar(...)` → usually a read, but can be a write with `OUTPUT`/`RETURNING`
 
-```bash
-rg -tcs 'SqlCommand|OleDbCommand|OdbcCommand|IDbCommand\b|DbCommand\b' -n
-rg -tcs 'CommandText\s*=' -n
-rg -tcs '\.ExecuteReader(Async)?\(|\.ExecuteNonQuery(Async)?\(|\.ExecuteScalar(Async)?\(' -n
-```
+Patterns:
+- `SqlCommand|OleDbCommand|OdbcCommand|IDbCommand\b|DbCommand\b`
+- `CommandText\s*=`
+- `\.ExecuteReader(Async)?\(|\.ExecuteNonQuery(Async)?\(|\.ExecuteScalar(Async)?\(`
 
 Match the `Async`-suffixed overloads too (`ExecuteReaderAsync`, `ExecuteNonQueryAsync`,
 `ExecuteScalarAsync`) — they're the more common form in current code, and `\.ExecuteReader\(`
@@ -47,18 +80,17 @@ named `usp_InsertX` / `usp_UpdateX` and the app passes data in). Say in `notes` 
 statement body isn't visible from source and the table-level detail is inferred from the
 proc name only, not confirmed.
 
-```bash
-rg -tcs 'CommandType\.StoredProcedure' -n -B3
-```
+Pattern: `CommandType\.StoredProcedure` — then read a few lines above the hit (the
+`SqlCommand` construction that sets it) for the connection and proc name; there's no
+substitute for reading the surrounding code here, since the useful context comes *before*
+the match, not after.
 
 ## SQL via Dapper
 
 Dapper is a set of extension methods on `IDbConnection`, so the "connection" signatures
 above still apply for finding the connection itself. The execution calls:
 
-```bash
-rg -tcs '\.Query(Async)?<|\.QueryFirst(OrDefault)?(Async)?<|\.QueryMultiple\(|\.Execute(Async)?\(' -n
-```
+Pattern: `\.Query(Async)?<|\.QueryFirst(OrDefault)?(Async)?<|\.QueryMultiple\(|\.Execute(Async)?\(`
 
 The SQL text is usually the first string argument (inline, a `const string`, or a resource);
 trace it back the same way as ADO.NET `CommandText` above. Dapper's `param` argument (an
@@ -72,9 +104,7 @@ translates LINQ to SQL at runtime and the actual executed SQL (or the stored pro
 behind `FromSqlRaw`/`ExecuteSqlRaw` when those wrap a proc) isn't statically visible from the
 C# source with the same confidence as ADO.NET/Dapper's literal command text.
 
-```bash
-rg -tcs '\bDbContext\b|\bDbSet<' -n
-```
+Pattern: `\bDbContext\b|\bDbSet<`
 
 If this codebase uses EF, note it as a gap in your Step 6 report rather than guessing table
 names from entity class names — an entity's mapped table can be renamed via `[Table("...")]`
@@ -85,24 +115,23 @@ or Fluent API and silently diverge from the class name.
 A codebase touching multiple databases needs each `SqlConnection`/Dapper connection traced
 back to a specific database name before you can fill in `src_name`/`dst_name`.
 
-```bash
-rg -n '"ConnectionStrings' --glob '*.json'
-rg -tcs 'GetConnectionString\(|ConfigurationManager\.ConnectionStrings\[' -n
-rg -n '<connectionStrings>' -g '*.config' -A5
-rg -tcs 'ConnectionStrings__' -n   # env-var-style override (double underscore = section separator)
-```
+Patterns:
+- `"ConnectionStrings` — scope the search to `*.json` files (`appsettings.json`,
+  `appsettings.<env>.json`); each named entry usually has `Initial Catalog=<db>` or
+  `Database=<db>` in its value — that's your `src_name`/`dst_name`.
+- `<connectionStrings>` — scope to `*.config` files (`web.config`/`app.config`):
+  `<connectionStrings><add name="..." connectionString="..." />`.
+- `GetConnectionString\(|ConfigurationManager\.ConnectionStrings\[` — how the app pulls the
+  string above into an `SqlConnection` at runtime; match the `"Name"` argument back to the
+  config file entry.
+- `ConnectionStrings__` — an env-var-style override (double underscore = section separator
+  in ASP.NET Core's configuration provider).
 
-- `appsettings.json` / `appsettings.<env>.json`: look for a `"ConnectionStrings"` section;
-  each named entry usually has `Initial Catalog=<db>` or `Database=<db>` in its value — that's
-  your `src_name`/`dst_name`.
-- `web.config`/`app.config`: `<connectionStrings><add name="..." connectionString="..." />`.
-- `IConfiguration.GetConnectionString("Name")` or `ConfigurationManager.ConnectionStrings["Name"].ConnectionString`
-  is how the app pulls the string above into an `SqlConnection` at runtime — match the `"Name"`
-  back to the config file entry.
-- Environment-variable overrides (`ConnectionStrings__Orders` in ASP.NET Core's env-var
-  configuration provider) can replace the config-file value in a given environment — if you
-  see this pattern, note in `notes` that the actual database is environment-dependent and
-  name the config key rather than asserting one database name as fact.
+Notes:
+- Environment-variable overrides (`ConnectionStrings__Orders`) can replace the config-file
+  value in a given environment — if you see this pattern, note in `notes` that the actual
+  database is environment-dependent and name the config key rather than asserting one
+  database name as fact.
 - **Key Vault / Azure App Configuration**: if the connection string is a Key Vault reference
   (`@Microsoft.KeyVault(...)`) or pulled from App Configuration at startup, the real value
   isn't visible from source at all. Use the config key name as `src_name`/`dst_name` and say
@@ -112,18 +141,17 @@ rg -tcs 'ConnectionStrings__' -n   # env-var-style override (double underscore =
 
 **Outbound calls** (this app calling another system):
 
-```bash
-rg -tcs '\bHttpClient\b|IHttpClientFactory|\.GetAsync\(|\.PostAsync\(|\.PutAsync\(|\.PatchAsync\(|\.DeleteAsync\(|\.SendAsync\(' -n
-rg -tcs '\.(Get|Post|Put|Patch|Delete)FromJsonAsync\b|\.(Post|Put|Patch)AsJsonAsync\b' -n   # System.Net.Http.Json extensions
-rg -tcs '\bRestClient\b|RestRequest' -n           # RestSharp
-rg -tcs '\.WithUrl\(|GetJsonAsync|PostJsonAsync' -n   # Flurl
-rg -tcs '\[Get\(|\[Post\(|\[Put\(|\[Delete\(' -n      # Refit interface methods
-```
+Patterns:
+- `\bHttpClient\b|IHttpClientFactory|\.GetAsync\(|\.PostAsync\(|\.PutAsync\(|\.PatchAsync\(|\.DeleteAsync\(|\.SendAsync\(`
+- `\.(Get|Post|Put|Patch|Delete)FromJsonAsync\b|\.(Post|Put|Patch)AsJsonAsync\b` — `System.Net.Http.Json` extensions
+- `\bRestClient\b|RestRequest` — RestSharp
+- `\.WithUrl\(|GetJsonAsync|PostJsonAsync` — Flurl
+- `\[Get\(|\[Post\(|\[Put\(|\[Delete\(` — Refit interface methods
 
 The `System.Net.Http.Json` extension methods (`GetFromJsonAsync`, `PostAsJsonAsync`, etc.)
 are at least as common as the bare verb calls in current code and are **not** matched by the
-first line above (`.PostAsJsonAsync(` doesn't contain `.PostAsync(` as a substring) - always
-run the second line too, and don't rely on the bare-verb pattern alone to rule out a JSON API
+first pattern above (`.PostAsJsonAsync(` doesn't contain `.PostAsync(` as a substring) - always
+run the second pattern too, and don't rely on the bare-verb pattern alone to rule out a JSON API
 call. The `\bHttpClient\b` hit on the class itself still anchors you to the right file either
 way, which is why "read the surrounding method" (not just the matched line) matters here.
 
@@ -139,10 +167,9 @@ consumed.
 
 **Inbound endpoints** (this app receiving data from a caller):
 
-```bash
-rg -tcs '\[ApiController\]|\[Route\(|\[HttpGet\]|\[HttpPost\]|\[HttpPut\]|\[HttpDelete\]' -n
-rg -tcs '\bapp\.Map(Get|Post|Put|Delete)\(' -n   # minimal API
-```
+Patterns:
+- `\[ApiController\]|\[Route\(|\[HttpGet\]|\[HttpPost\]|\[HttpPut\]|\[HttpDelete\]`
+- `\bapp\.Map(Get|Post|Put|Delete)\(` — minimal API
 
 A controller action or minimal-API handler that reads `[FromBody]`/model-bound parameters and
 persists or forwards them → the request is a **source** (`src_type: API`, `src_name` = this
@@ -158,23 +185,21 @@ come from."
 
 **Reads** (source):
 
-```bash
-rg -tcs 'File\.ReadAllText\(|File\.ReadAllLines\(|File\.ReadAllBytes\(|\bStreamReader\b' -n
-rg -tcs '\bExcelPackage\b|\.Worksheets\[|\.Cells\[' -n         # EPPlus
-rg -tcs '\bXLWorkbook\b' -n                                     # ClosedXML
-rg -tcs '\bCsvReader\b' -n                                       # CsvHelper
-rg -tcs 'SpreadsheetDocument\.Open\(' -n                         # OpenXML SDK
-rg -tcs '\bHSSFWorkbook\b|\bXSSFWorkbook\b' -n                   # NPOI
-```
+Patterns:
+- `File\.ReadAllText\(|File\.ReadAllLines\(|File\.ReadAllBytes\(|\bStreamReader\b`
+- `\bExcelPackage\b|\.Worksheets\[|\.Cells\[` — EPPlus
+- `\bXLWorkbook\b` — ClosedXML
+- `\bCsvReader\b` — CsvHelper
+- `SpreadsheetDocument\.Open\(` — OpenXML SDK
+- `\bHSSFWorkbook\b|\bXSSFWorkbook\b` — NPOI
 
 **Writes** (destination):
 
-```bash
-rg -tcs 'File\.WriteAllText\(|File\.WriteAllLines\(|File\.WriteAllBytes\(|File\.AppendAllText\(|\bStreamWriter\b' -n
-rg -tcs '\.SaveAs\(|package\.Save\(' -n                          # EPPlus / ClosedXML
-rg -tcs '\bCsvWriter\b' -n                                       # CsvHelper
-rg -tcs 'SpreadsheetDocument\.Create\(' -n                       # OpenXML SDK
-```
+Patterns:
+- `File\.WriteAllText\(|File\.WriteAllLines\(|File\.WriteAllBytes\(|File\.AppendAllText\(|\bStreamWriter\b`
+- `\.SaveAs\(|package\.Save\(` — EPPlus / ClosedXML
+- `\bCsvWriter\b` — CsvHelper
+- `SpreadsheetDocument\.Create\(` — OpenXML SDK
 
 For either direction, the file path expression gives you `src_tbl`/`dst_tbl` (the leaf
 filename — normalize a computed timestamp segment to a token, e.g. `export_{yyyyMMdd}.csv`)
@@ -182,11 +207,10 @@ and its directory/share/drive gives you `src_name`/`dst_name`.
 
 ## SFTP
 
-```bash
-rg -tcs '\bSftpClient\b|\.UploadFile\(|\.DownloadFile\(' -n   # SSH.NET (Renci.SshNet)
-rg -tcs '\bSession\b.*WinSCP|WinSCP\.' -n                       # WinSCP .NET assembly
-rg -tcs '\bFtpClient\b' -n                                      # FluentFTP (FTP/FTPS — adjust dst_type if plain FTP, not SFTP)
-```
+Patterns:
+- `\bSftpClient\b|\.UploadFile\(|\.DownloadFile\(` — SSH.NET (Renci.SshNet)
+- `\bSession\b.*WinSCP|WinSCP\.` — WinSCP .NET assembly
+- `\bFtpClient\b` — FluentFTP (FTP/FTPS — adjust `dst_type` if plain FTP, not SFTP)
 
 `dst_type` is `File (SFTP)`; `dst_name` is the SFTP host (+ remote base directory if constant);
 `dst_tbl` is the remote filename. `UploadFile`/`Put`-style calls are destinations;
@@ -195,23 +219,21 @@ doesn't distinguish disk from SFTP the way the destination side does — see `sc
 
 ## SharePoint
 
-```bash
-rg -tcs 'Microsoft\.SharePoint\.Client|\bClientContext\b|SaveBinaryDirect\(' -n   # CSOM
-rg -tcs 'PnP\.(Framework|Core)|\bPnPContext\b' -n                                  # PnP
-rg -tcs 'GraphServiceClient|\.Drives\[|\.Sites\[.*\]\.Drive' -n                    # Microsoft Graph
-```
+Patterns:
+- `Microsoft\.SharePoint\.Client|\bClientContext\b|SaveBinaryDirect\(` — CSOM
+- `PnP\.(Framework|Core)|\bPnPContext\b` — PnP
+- `GraphServiceClient|\.Drives\[|\.Sites\[.*\]\.Drive` — Microsoft Graph
 
 `dst_type` is `File (SharePoint)`; `dst_name` is the site URL or document library; `dst_tbl`
 is the uploaded file name (+ folder path within the library if constant).
 
 ## Email
 
-```bash
-rg -tcs '\bSmtpClient\b|\bMailMessage\b' -n         # System.Net.Mail
-rg -tcs '\bMimeMessage\b|MailKit\.' -n               # MailKit/MimeKit
-rg -tcs 'SendGridClient|SendGridMessage' -n           # SendGrid SDK
-rg -tcs '\.SendMail\(|Users\[.*\]\.SendMail' -n       # Microsoft Graph sendMail
-```
+Patterns:
+- `\bSmtpClient\b|\bMailMessage\b` — System.Net.Mail
+- `\bMimeMessage\b|MailKit\.` — MailKit/MimeKit
+- `SendGridClient|SendGridMessage` — SendGrid SDK
+- `\.SendMail\(|Users\[.*\]\.SendMail` — Microsoft Graph sendMail
 
 `dst_type` is `Email`. `dst_name` is the sending mechanism (SMTP relay host from config, or
 the named service — e.g. `"MS Graph sendMail"`); `dst_tbl` is the recipient address, mailing
