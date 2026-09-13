@@ -39,23 +39,18 @@ Before starting Pass 1, confirm:
 
 ### Step 0: Discover flows
 
-Read `references/detection-patterns.md` before scanning. It has the exact C# signatures and
-search patterns to find — run them with `search_content` (fuseraft's built-in search tool;
-always available, no install) or `rg` if it genuinely happens to be on `PATH` in this
-environment (check first, don't assume — see the reference doc for why):
-- SQL executed via ADO.NET (`SqlCommand`/`OleDbCommand`/`OdbcCommand`) and Dapper, plus where connection strings are resolved from
-- Outbound calls to external APIs and inbound endpoints this app exposes (`HttpClient`, `RestSharp`, Refit, ASP.NET Core controllers/minimal APIs)
-- File reads/writes (`EPPlus`, `ClosedXML`, `CsvHelper`, `System.IO`, OpenXML SDK)
-- SFTP/SharePoint transfers (`SSH.NET`, `WinSCP`, CSOM/PnP, Microsoft Graph)
-- Email sends (`System.Net.Mail`, MailKit, SendGrid, Graph `sendMail`)
+Read `references/detection-patterns.md` before scanning — it has the exact signatures, search
+patterns, and tool guidance (don't assume `rg` is installed; fuseraft's own `search_content` is
+the reliable default) for:
+- SQL via ADO.NET/Dapper, plus connection-string resolution
+- Outbound API calls and inbound endpoints this app exposes
+- File reads/writes, SFTP, SharePoint, email
 
-For each hit, read enough surrounding code to determine: is this object a **source** (data
-is read from it) or a **destination** (data is written to it)? The same table or endpoint can
-be both, in different flows — each direction is its own row.
+For each hit, read enough surrounding code to tell source from destination — the same table or
+endpoint can be both, in different flows; each direction is its own row.
 
-Read `references/schema.md` for the exact field conventions (what goes in `src_name` vs
-`src_tbl`, when to use `N/A` vs `*`, how to handle column-level granularity) before writing
-any rows — getting this wrong means redoing Pass 1.
+Read `references/schema.md` before writing any rows — getting the field conventions wrong
+means redoing Pass 1.
 
 ### Step 1: Generate the JSONL (Pass 1 — structural)
 
@@ -178,15 +173,10 @@ or App Configuration at runtime rather than statically visible).
 - `references/schema.md` — the ten fields in detail, per-source-type field conventions (what
   `src_name` vs `src_tbl` means for Database/API/File/Email on each side), sentinel values,
   and row-cardinality guidance (when to split by column vs collapse with `*`)
-- `references/detection-patterns.md` — C# signatures and search patterns (tool-agnostic —
-  `search_content` by default, `rg` only if actually present) for finding SQL (ADO.NET/Dapper),
-  connection strings, API calls (outbound and inbound), file I/O, SFTP, SharePoint, and email
-  sends; how to tell source from destination for API flows; when to read a whole file directly
-  instead of relying on a pattern search to find the relevant lines first
-- `references/notes-guidance.md` — checklist of what belongs in `notes` (transformations,
-  masking, batching, opaque procs, runtime-resolved config) with good/bad examples
-- `references/examples.md` — a worked example: sample C# snippets through all four passes
-  to final CSV
+- `references/detection-patterns.md` — C# signatures and tool-agnostic search patterns for
+  SQL, connection strings, API calls, file I/O, SFTP, SharePoint, and email; source-vs-destination
+  rules for API flows; when to read a whole file directly instead of searching it
+- `references/notes-guidance.md` — checklist of what belongs in `notes`, with good/bad examples
 
 ## Scripts
 

@@ -98,31 +98,23 @@ the user's original spec calls them out as examples ("Database, API, etc."). A v
 these sets is a **warning**, not a validation error, from `Test-DataMapJsonl.ps1`.
 
 Reasonable reasons to go outside the set: a message queue (`src_type: "Queue"`), a
-config/environment-variable source, a cache (Redis) as either side, or **`"Runtime"`** for a
-value the application computes itself rather than reads from anywhere external — a
-`DateTime.UtcNow`/`Guid.NewGuid()` timestamp or correlation ID, a hardcoded constant, a
-counter. If you do, keep the value consistent across the whole datamap (don't mix `"Queue"`
-and `"MessageQueue"` for the same concept in one file) and consider naming the addition in
-your final report to the user so they can decide whether to fold it into a future schema
-revision.
+config/environment-variable source, a cache (Redis) as either side, or `"Runtime"` (below).
+Keep the value consistent within one datamap (don't mix `"Queue"`/`"MessageQueue"` for the
+same concept) and name any addition in your Step 6 report.
 
-**`Runtime` as `src_type`** is the answer to a specific recurring judgment call: a destination
-column or API payload field is populated from something computed in-process (a watermark
-timestamp being saved, an audit/load-time column, a generated ID) rather than read from a
-source table, file, or API response. Two resolutions are both defensible:
-- **Map it** with `src_type: "Runtime"`, `src_name` naming the process/component that computes
-  it (e.g. `"SalesSyncJob process"`), `src_tbl` naming the expression (e.g.
-  `"DateTime.UtcNow (runStartedUtc)"`), `src_col: "N/A"` — this surfaces the row in the CSV
-  for governance/completeness, at the cost of one `Test-DataMapJsonl.ps1` warning per row
-  (`src_type` outside the recommended set).
-- **Don't map it**, and call it out in your Step 6 report instead ("`SalesFact.LoadedUtc` is a
-  computed timestamp, not sourced from any table — not mapped as a row").
+**`Runtime` as `src_type`** answers a recurring judgment call: a destination column or API
+payload is populated from something computed in-process (a watermark timestamp, an audit
+column, a generated ID) rather than read externally. Two resolutions, both defensible:
+- **Map it**: `src_type: "Runtime"`, `src_name` = the process/component (e.g. `"SalesSyncJob process"`),
+  `src_tbl` = the expression (e.g. `"DateTime.UtcNow (runStartedUtc)"`), `src_col: "N/A"` —
+  surfaces the row for governance/completeness, at the cost of one validator warning per row.
+- **Don't map it** — call it out in Step 6 instead (e.g. "`SalesFact.LoadedUtc` is a computed
+  timestamp, not sourced from any table").
 
-Prefer mapping it with `Runtime` when the value's *destination* is itself governance-relevant
-(it lands in a table/file/API a compliance reviewer cares about) - the CSV is then a complete
-inventory of everything that reaches that destination, computed or not. Prefer leaving it
-unmapped when the computed value is purely internal bookkeeping with no interesting
-destination of its own. Either way, be consistent within one datamap run.
+Prefer mapping it when the destination itself is governance-relevant (a table/file/API a
+compliance reviewer cares about) so the CSV is a complete inventory of what reaches it,
+computed or not. Prefer leaving it unmapped when it's purely internal bookkeeping. Be
+consistent within one run either way.
 
 ## Worked shape (all four flow directions)
 
@@ -133,5 +125,6 @@ destination of its own. Either way, be consistent within one datamap run.
 {"name":"OrderService","src_type":"API","src_name":"https://api.partner.example.com","src_tbl":"GET /v2/inventory/{sku}","src_col":"N/A","dst_type":"Database","dst_name":"OrdersDB","dst_tbl":"dbo.InventorySnapshot","dst_col":"QuantityOnHand","notes":""}
 ```
 
-See `references/examples.md` for these same flows with `notes` populated (Pass 3) and the
-resulting CSV.
+For a full worked run against real (fake-connection) C# source through all four passes to a
+validated CSV, see the `SalesSyncJob` and `LegacyInventorySync` fixtures in
+[fuseraft/datamap-test-fixture](https://github.com/fuseraft/datamap-test-fixture).
