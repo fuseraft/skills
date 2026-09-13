@@ -39,8 +39,10 @@ Before starting Pass 1, confirm:
 
 ### Step 0: Discover flows
 
-Read `references/detection-patterns.md` before scanning. It has the exact C# signatures
-and `rg` (ripgrep) commands to find:
+Read `references/detection-patterns.md` before scanning. It has the exact C# signatures and
+search patterns to find — run them with `search_content` (fuseraft's built-in search tool;
+always available, no install) or `rg` if it genuinely happens to be on `PATH` in this
+environment (check first, don't assume — see the reference doc for why):
 - SQL executed via ADO.NET (`SqlCommand`/`OleDbCommand`/`OdbcCommand`) and Dapper, plus where connection strings are resolved from
 - Outbound calls to external APIs and inbound endpoints this app exposes (`HttpClient`, `RestSharp`, Refit, ASP.NET Core controllers/minimal APIs)
 - File reads/writes (`EPPlus`, `ClosedXML`, `CsvHelper`, `System.IO`, OpenXML SDK)
@@ -176,9 +178,11 @@ or App Configuration at runtime rather than statically visible).
 - `references/schema.md` — the ten fields in detail, per-source-type field conventions (what
   `src_name` vs `src_tbl` means for Database/API/File/Email on each side), sentinel values,
   and row-cardinality guidance (when to split by column vs collapse with `*`)
-- `references/detection-patterns.md` — C# signatures and `rg` commands for finding SQL
-  (ADO.NET/Dapper), connection strings, API calls (outbound and inbound), file I/O, SFTP,
-  SharePoint, and email sends; how to tell source from destination for API flows
+- `references/detection-patterns.md` — C# signatures and search patterns (tool-agnostic —
+  `search_content` by default, `rg` only if actually present) for finding SQL (ADO.NET/Dapper),
+  connection strings, API calls (outbound and inbound), file I/O, SFTP, SharePoint, and email
+  sends; how to tell source from destination for API flows; when to read a whole file directly
+  instead of relying on a pattern search to find the relevant lines first
 - `references/notes-guidance.md` — checklist of what belongs in `notes` (transformations,
   masking, batching, opaque procs, runtime-resolved config) with good/bad examples
 - `references/examples.md` — a worked example: sample C# snippets through all four passes
