@@ -1,6 +1,6 @@
 # Skills Repository
 
-This repository contains reusable skills for database operations and other workflows.
+This repository contains reusable, project-agnostic skills for the fuseraft Agent Skills ecosystem — database operations, document generation, commits, sandboxed experimentation, data-flow mapping, and more.
 
 ## Contents
 
@@ -143,6 +143,31 @@ pwsh -File datamap/scripts/ConvertTo-DataMapCsv.ps1 -JsonlPath datamap.jsonl -Cs
 For detailed usage, see:
 - [datamap SKILL.md](datamap/SKILL.md) - Full four-pass workflow
 - [datamap schema reference](datamap/references/schema.md) - Field conventions and sentinel values
+
+### terminal-screenshot Skill
+
+Captures a real screenshot of an actual terminal application running real commands — not an HTML/CSS mockup — on an isolated virtual display that never touches the user's real desktop or real settings. Linux/X11 only.
+
+**Location:** `terminal-screenshot/`
+
+**Key Features:**
+- Runs the terminal emulator on an isolated Xvfb display, forced off Wayland (`GDK_BACKEND=x11`) so it can't render on the user's real desktop
+- Never uses `gsettings`/`dconf` to theme the session (that routes through the shared D-Bus bus and mutates the user's real app settings); colors are set at runtime only via OSC escape sequences
+- Drives real content into the visible session via `tmux send-keys`, polling for a clean prompt instead of guessing sleep durations
+- Full teardown-and-reverify checklist, including the sandbox's habit of silently reaping detached background processes between steps
+
+**Structure:**
+- `SKILL.md` - Critical safety rules plus the full capture/crop/cleanup workflow
+
+**Quick Start:**
+
+No setup required — read the two Critical Safety Rules first, then follow the numbered workflow starting from:
+```bash
+for c in tilix xterm kitty alacritty gnome-terminal konsole foot wezterm; do command -v "$c" && break; done
+```
+
+For detailed usage, see:
+- [terminal-screenshot SKILL.md](terminal-screenshot/SKILL.md) - Full workflow and both safety rules
 
 ## Development
 
