@@ -154,6 +154,23 @@ Expected behavior:
 - create a new work item comment through REST
 - return the work item ID, comment ID, comment version, and comment text when available
 
+#### `scripts/work-item-comment-list`
+Purpose:
+- fetch existing comments from a work item
+
+Suggested arguments:
+- `--id <work-item-id>`
+- `--top <count>`
+- `--order <asc|desc>`
+- `--continuation-token <token>`
+- `--org <url>`
+- `--project <name>`
+- `--backend <auto|cli|rest>`
+- `--output <json|table|tsv>`
+
+Expected behavior:
+- return comments for the work item through REST, including total/returned counts and a continuation token for paging when present
+
 #### `scripts/work-item-create`
 Purpose:
 - create a work item with a small, practical field surface
@@ -338,6 +355,7 @@ Implemented so far (see "Implemented write support" and "Implemented additional 
 - `scripts/work-item-get.py`
 - `scripts/work-item-query.py`
 - `scripts/work-item-comment.py`
+- `scripts/work-item-comment-list.py`
 - `scripts/work-item-create.py`
 - `scripts/work-item-update.py`
 - `scripts/pr-list.py`
@@ -368,12 +386,17 @@ In addition to the read-oriented scripts, this skill now includes:
 - `--state <state>`
 - `--assigned-to <identity>`
 - `--description <text>`
+- `--acceptance-criteria <text>` (Microsoft.VSTS.Common.AcceptanceCriteria; typically used on User Story/PBI items)
+- `--repro-steps <text>` (Microsoft.VSTS.TCM.ReproSteps; typically used on Bug items)
+- `--system-info <text>` (Microsoft.VSTS.TCM.SystemInfo; typically used on Bug items)
 - repeated `--field <name=value>`
 
 Example:
 
 ```powershell
 python scripts/work-item-update.py --backend rest --id 48520 --state Active --field Microsoft.VSTS.Common.Priority=1
+python scripts/work-item-update.py --backend rest --id 48521 --acceptance-criteria "Given/When/Then..."
+python scripts/work-item-update.py --backend rest --id 48522 --repro-steps "1. Do X 2. Observe Y" --system-info "Windows Server 2022, build 20348"
 ```
 
 `work-item-create.py` supports:

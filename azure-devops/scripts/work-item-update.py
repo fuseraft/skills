@@ -23,6 +23,9 @@ FIELD_ALIASES = {
     "state": "System.State",
     "assigned_to": "System.AssignedTo",
     "description": "System.Description",
+    "acceptance_criteria": "Microsoft.VSTS.Common.AcceptanceCriteria",
+    "repro_steps": "Microsoft.VSTS.TCM.ReproSteps",
+    "system_info": "Microsoft.VSTS.TCM.SystemInfo",
 }
 
 RETURN_FIELDS = [
@@ -31,6 +34,9 @@ RETURN_FIELDS = [
     "System.State",
     "System.AssignedTo",
     "System.Description",
+    "Microsoft.VSTS.Common.AcceptanceCriteria",
+    "Microsoft.VSTS.TCM.ReproSteps",
+    "Microsoft.VSTS.TCM.SystemInfo",
 ]
 
 
@@ -42,6 +48,18 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--state", help="Set System.State")
     parser.add_argument("--assigned-to", help="Set System.AssignedTo")
     parser.add_argument("--description", help="Set System.Description")
+    parser.add_argument(
+        "--acceptance-criteria",
+        help="Set Microsoft.VSTS.Common.AcceptanceCriteria (commonly used on User Story/PBI items)",
+    )
+    parser.add_argument(
+        "--repro-steps",
+        help="Set Microsoft.VSTS.TCM.ReproSteps (commonly used on Bug items)",
+    )
+    parser.add_argument(
+        "--system-info",
+        help="Set Microsoft.VSTS.TCM.SystemInfo (commonly used on Bug items)",
+    )
     parser.add_argument(
         "--field",
         action="append",
@@ -93,6 +111,30 @@ def build_patch_document(args: argparse.Namespace) -> List[Dict[str, Any]]:
                 "value": args.description,
             }
         )
+    if args.acceptance_criteria is not None:
+        operations.append(
+            {
+                "op": "add",
+                "path": f"/fields/{FIELD_ALIASES['acceptance_criteria']}",
+                "value": args.acceptance_criteria,
+            }
+        )
+    if args.repro_steps is not None:
+        operations.append(
+            {
+                "op": "add",
+                "path": f"/fields/{FIELD_ALIASES['repro_steps']}",
+                "value": args.repro_steps,
+            }
+        )
+    if args.system_info is not None:
+        operations.append(
+            {
+                "op": "add",
+                "path": f"/fields/{FIELD_ALIASES['system_info']}",
+                "value": args.system_info,
+            }
+        )
 
     for raw_field in args.field:
         field_name, value = parse_field_assignment(raw_field)
@@ -102,7 +144,8 @@ def build_patch_document(args: argparse.Namespace) -> List[Dict[str, Any]]:
 
     if not operations:
         raise AdoScriptError(
-            "Specify at least one update via --title, --state, --assigned-to, --description, or --field"
+            "Specify at least one update via --title, --state, --assigned-to, --description, "
+            "--acceptance-criteria, --repro-steps, --system-info, or --field"
         )
 
     return operations
@@ -118,6 +161,12 @@ def build_requested_changes(args: argparse.Namespace) -> Dict[str, Any]:
         changes[FIELD_ALIASES["assigned_to"]] = args.assigned_to
     if args.description is not None:
         changes[FIELD_ALIASES["description"]] = args.description
+    if args.acceptance_criteria is not None:
+        changes[FIELD_ALIASES["acceptance_criteria"]] = args.acceptance_criteria
+    if args.repro_steps is not None:
+        changes[FIELD_ALIASES["repro_steps"]] = args.repro_steps
+    if args.system_info is not None:
+        changes[FIELD_ALIASES["system_info"]] = args.system_info
     for raw_field in args.field:
         field_name, value = parse_field_assignment(raw_field)
         changes[field_name] = value
