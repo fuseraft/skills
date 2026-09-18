@@ -179,6 +179,7 @@ def main() -> int:
             context,
             method="POST",
             path=f"_apis/wit/workitems/${encoded_type}",
+            project=context.get("project"),
             query={"fields": ",".join(RETURN_FIELDS)},
             body=patch_document,
             body_content_type="application/json-patch+json",
