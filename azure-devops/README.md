@@ -63,51 +63,6 @@ In many on-prem or GCC High-style environments, REST is the more dependable defa
 - some CLI features are incomplete for the task
 - Server deployments often benefit from direct URL and PAT control
 
-## Current scripts
-
-### Foundation
-
-#### `scripts/check-ado-prereqs.py`
-Checks whether the environment is ready for CLI and/or REST usage.
-
-What it reports:
-- resolved org or collection URL
-- project presence
-- PAT presence
-- Azure CLI presence
-- extension status
-- URL classification
-  - cloud
-  - server/on-prem
-  - valid/invalid
-- requested and resolved backend
-
-Examples:
-
-```powershell
-python scripts/check-ado-prereqs.py --output json
-python scripts/check-ado-prereqs.py --org https://ado.contoso.mil/tfs/DefaultCollection --project MyProject --backend rest --output table
-```
-
-#### `scripts/show-ado-context.py`
-Shows the resolved execution context that downstream scripts will use.
-
-What it reports:
-- org or collection URL
-- project
-- optional repo
-- auth presence
-- deployment classification
-- available backends
-- resolved backend
-
-Examples:
-
-```powershell
-python scripts/show-ado-context.py --output json
-python scripts/show-ado-context.py --org https://ado.contoso.mil/tfs/DefaultCollection --project MyProject --repo MyRepo --backend auto --verbose --output table
-```
-
 ## Common flags
 
 The foundation scripts currently support:
@@ -153,125 +108,25 @@ Where possible, scripts should return:
 
 ## Current scripts
 
+### Foundation
+
+See [`references/foundation.md`](references/foundation.md) for the full reference: `check-ado-prereqs.py`, `show-ado-context.py`.
+
 ### Work items
 
-#### `scripts/work-item-get.py`
-Retrieves a work item by ID through REST.
+See [`references/work-items.md`](references/work-items.md) for the full reference: `work-item-get.py`, `work-item-query.py`, `work-item-comment.py`, `work-item-comment-list.py`, `work-item-create.py`, `work-item-update.py`.
 
-#### `scripts/work-item-query.py`
-Executes a WIQL query and returns matching work item IDs, with optional verbose expansion.
+### Repositories and code search
 
-#### `scripts/work-item-comment.py`
-Adds a comment to an existing work item through REST.
+See [`references/repositories.md`](references/repositories.md) for the full reference: `repo-list.py`, `code-search.py`.
 
-#### `scripts/work-item-comment-list.py`
-Fetches comments from an existing work item through REST.
+### Pull requests
 
-Supported flags:
-- `--id`
-- `--top` - maximum number of comments to return
-- `--order <asc|desc>` - sort by creation date
-- `--continuation-token` - page through results using the token from a previous response
+See [`references/pull-requests.md`](references/pull-requests.md) for the full reference: `pr-list.py`, `pr-get.py`, `pr-comment.py`.
 
-Example:
+### Pipelines
 
-```powershell
-python scripts/work-item-comment-list.py --backend rest --id 48520 --order desc --output table
-```
-
-#### `scripts/work-item-update.py`
-Updates an existing work item through REST using Azure DevOps JSON Patch.
-
-Supported update flags:
-- `--id`
-- `--title`
-- `--state`
-- `--assigned-to`
-- `--description`
-- `--acceptance-criteria` - Microsoft.VSTS.Common.AcceptanceCriteria, typically used on User Story/PBI items
-- `--repro-steps` - Microsoft.VSTS.TCM.ReproSteps, typically used on Bug items
-- `--system-info` - Microsoft.VSTS.TCM.SystemInfo, typically used on Bug items
-- repeated `--field NAME=VALUE`
-
-Example:
-
-```powershell
-python scripts/work-item-update.py --backend rest --id 48520 --state Active --assigned-to "user@example.com" --field Microsoft.VSTS.Common.Priority=1
-python scripts/work-item-update.py --backend rest --id 48521 --repro-steps "1. Do X 2. Observe Y" --system-info "Windows Server 2022, build 20348"
-```
-
-#### `scripts/work-item-create.py`
-Creates a new work item through REST using Azure DevOps JSON Patch.
-
-Supported create flags:
-- `--type`
-- `--title`
-- `--description`
-- `--assigned-to`
-- repeated `--field NAME=VALUE`
-
-Example:
-
-```powershell
-python scripts/work-item-create.py --backend rest --type Bug --title "Example bug" --field Microsoft.VSTS.Common.Priority=1
-```
-
-#### `scripts/repo-list.py`
-Lists Azure DevOps Git repositories through REST.
-
-Supported flags:
-- `--all-projects` - list repositories across the whole organization or collection instead of a single project
-- `--include-links` - include the `_links` block for each repository
-
-Example:
-
-```powershell
-python scripts/repo-list.py --backend rest --output table
-python scripts/repo-list.py --backend rest --all-projects --output json
-```
-
-#### `scripts/code-search.py`
-Searches code across repositories through the Azure DevOps Code Search REST API.
-
-Supported flags:
-- `--text <query>` (required), e.g. `myFunction` or `ext:cs myFunction`
-- repeated `--repo <name>` to limit results to one or more repositories
-- repeated `--path <path>` to limit results to a repository-relative path prefix
-- repeated `--branch <name>` to limit results to a branch
-- repeated `--extension <ext>` to limit results to a file extension
-- `--top <count>` and `--skip <count>` for paging
-- `--include-facets` to include facet counts in the response
-
-Note: this requires the Code Search extension/feature to be installed and enabled for the organization or collection. On Azure DevOps Services (cloud), the search API is hosted on a dedicated `almsearch.dev.azure.com` host; the skill resolves this automatically. On Azure DevOps Server / on-prem collections, the same collection host is used.
-
-Example:
-
-```powershell
-python scripts/code-search.py --backend rest --text "ext:cs myFunction" --repo MyRepo --output table
-```
-
-#### `scripts/pr-list.py`
-Lists pull requests for a repository through REST.
-
-#### `scripts/pr-get.py`
-Retrieves a pull request by ID through REST, with optional threads and linked work item references.
-
-#### `scripts/pr-comment.py`
-Adds a pull request discussion thread through REST.
-
-Supported comment flags:
-- `--id`
-- `--comment`
-- `--status`
-- `--comment-type`
-- optional `--file-path`
-- optional `--right-file-start-line`, `--right-file-start-offset`, `--right-file-end-line`, `--right-file-end-offset`
-
-Example:
-
-```powershell
-python scripts/pr-comment.py --backend rest --repo MyRepo --id 123 --comment "Please add a null check here."
-```
+See [`references/pipelines.md`](references/pipelines.md) for the full reference: `pipeline-runs.py`.
 
 ## Expected next scripts
 
@@ -289,4 +144,3 @@ Pipeline-related work (`scripts/pipeline-list.py`, `scripts/pipeline-run-queue.p
 ## Development notes
 
 This skill currently implements the shared helper, foundation scripts, and REST-first scripts for work items, pull requests, repository listing, code search, and pipeline run listing (see "Current scripts" above). The `--backend cli` option is accepted by all scripts but not yet implemented; every script currently requires `--backend rest` (or `auto`, which resolves to `rest`).
-

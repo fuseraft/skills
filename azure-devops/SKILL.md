@@ -74,4 +74,4 @@ For v1, scripts should aim to:
 - Pull requests: `pr-list.py`, `pr-get.py`, `pr-comment.py`
 - Pipelines: `pipeline-runs.py`
 
-See `README.md` in this skill directory for full flag reference and examples for each script. Pipeline work beyond `pipeline-runs.py`, work item linking, and attachment support are not yet implemented.
+Full flag references and examples for each script are in `references/`: `references/foundation.md`, `references/work-items.md`, `references/repositories.md`, `references/pull-requests.md`, and `references/pipelines.md`. Work item linking and attachment support are not yet implemented.
