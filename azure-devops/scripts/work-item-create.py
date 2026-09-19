@@ -17,12 +17,14 @@ from _ado_common import (
     emit_output,
     resolve_backend,
     resolve_context,
+    to_ado_html,
 )
 
 FIELD_ALIASES = {
     "title": "System.Title",
     "description": "System.Description",
     "assigned_to": "System.AssignedTo",
+    "acceptance_criteria": "Microsoft.VSTS.Common.AcceptanceCriteria",
 }
 
 RETURN_FIELDS = [
@@ -31,6 +33,7 @@ RETURN_FIELDS = [
     "System.State",
     "System.AssignedTo",
     "System.Description",
+    "Microsoft.VSTS.Common.AcceptanceCriteria",
 ]
 
 
@@ -44,6 +47,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--title", required=True, help="Set System.Title")
     parser.add_argument("--description", help="Set System.Description")
+    parser.add_argument(
+        "--acceptance-criteria",
+        help="Set Microsoft.VSTS.Common.AcceptanceCriteria (commonly used on User Story/PBI items)",
+    )
     parser.add_argument("--assigned-to", help="Set System.AssignedTo")
     parser.add_argument(
         "--field",
@@ -79,7 +86,15 @@ def build_patch_document(args: argparse.Namespace) -> List[Dict[str, Any]]:
             {
                 "op": "add",
                 "path": "/fields/System.Description",
-                "value": args.description,
+                "value": to_ado_html(args.description),
+            }
+        )
+    if args.acceptance_criteria is not None:
+        operations.append(
+            {
+                "op": "add",
+                "path": f"/fields/{FIELD_ALIASES['acceptance_criteria']}",
+                "value": to_ado_html(args.acceptance_criteria),
             }
         )
     if args.assigned_to is not None:
@@ -105,7 +120,9 @@ def build_requested_fields(args: argparse.Namespace) -> Dict[str, Any]:
         FIELD_ALIASES["title"]: args.title,
     }
     if args.description is not None:
-        requested[FIELD_ALIASES["description"]] = args.description
+        requested[FIELD_ALIASES["description"]] = to_ado_html(args.description)
+    if args.acceptance_criteria is not None:
+        requested[FIELD_ALIASES["acceptance_criteria"]] = to_ado_html(args.acceptance_criteria)
     if args.assigned_to is not None:
         requested[FIELD_ALIASES["assigned_to"]] = args.assigned_to
     for raw_field in args.field:

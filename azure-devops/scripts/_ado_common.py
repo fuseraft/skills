@@ -9,6 +9,7 @@ import json
 import os
 import shutil
 import sys
+from html import escape as html_escape
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode, urlparse
@@ -316,6 +317,50 @@ def resolve_search_base_url(org: str) -> str:
         return f"{parsed.scheme}://almsearch.dev.azure.com{path}".rstrip("/")
 
     return normalized
+
+
+def to_ado_html(text: Optional[str]) -> Optional[str]:
+    """Convert plain text into the minimal HTML that Azure DevOps rich-text fields
+    (System.Description, Microsoft.VSTS.Common.AcceptanceCriteria, ReproSteps,
+    SystemInfo) expect. Those fields render as HTML, so a raw '\\n' does nothing
+    in the UI — plain text with blank-line paragraphs and '- '/'* ' bullets would
+    otherwise collapse into one run-on block. Left untouched if the caller already
+    passed markup (a '<' anywhere), since re-escaping it would double-encode
+    intentional HTML.
+    """
+    if text is None or "<" in text:
+        return text
+
+    def render_block(block: str) -> str:
+        lines = [line.strip() for line in block.splitlines() if line.strip()]
+        parts: list[str] = []
+        bullets: list[str] = []
+        paragraph: list[str] = []
+
+        def flush_bullets() -> None:
+            if bullets:
+                items = "".join(f"<li>{html_escape(item)}</li>" for item in bullets)
+                parts.append(f"<ul>{items}</ul>")
+                bullets.clear()
+
+        def flush_paragraph() -> None:
+            if paragraph:
+                parts.append(f"<p>{'<br>'.join(html_escape(line) for line in paragraph)}</p>")
+                paragraph.clear()
+
+        for line in lines:
+            if line.startswith("- ") or line.startswith("* "):
+                flush_paragraph()
+                bullets.append(line[2:].strip())
+            else:
+                flush_bullets()
+                paragraph.append(line)
+        flush_bullets()
+        flush_paragraph()
+        return "".join(parts)
+
+    blocks = [block for block in text.strip().split("\n\n") if block.strip()]
+    return "".join(render_block(block) for block in blocks)
 
 
 def build_rest_url(

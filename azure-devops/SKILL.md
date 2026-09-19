@@ -69,7 +69,7 @@ For v1, scripts should aim to:
 ## Available scripts
 
 - Foundation: `check-ado-prereqs.py`, `show-ado-context.py`
-- Work items: `work-item-get.py`, `work-item-query.py`, `work-item-create.py`, `work-item-update.py`, `work-item-comment.py`, `work-item-comment-list.py`
+- Work items: `work-item-get.py`, `work-item-query.py`, `work-item-create.py`, `work-item-update.py`, `work-item-delete.py`, `work-item-comment.py`, `work-item-comment-list.py`
 - Repositories and code search: `repo-list.py`, `code-search.py`
 - Pull requests: `pr-list.py`, `pr-get.py`, `pr-comment.py`
 - Pipelines: `pipeline-runs.py`

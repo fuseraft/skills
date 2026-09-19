@@ -16,6 +16,7 @@ from _ado_common import (
     emit_output,
     resolve_backend,
     resolve_context,
+    to_ado_html,
 )
 
 FIELD_ALIASES = {
@@ -108,7 +109,7 @@ def build_patch_document(args: argparse.Namespace) -> List[Dict[str, Any]]:
             {
                 "op": "add",
                 "path": "/fields/System.Description",
-                "value": args.description,
+                "value": to_ado_html(args.description),
             }
         )
     if args.acceptance_criteria is not None:
@@ -116,7 +117,7 @@ def build_patch_document(args: argparse.Namespace) -> List[Dict[str, Any]]:
             {
                 "op": "add",
                 "path": f"/fields/{FIELD_ALIASES['acceptance_criteria']}",
-                "value": args.acceptance_criteria,
+                "value": to_ado_html(args.acceptance_criteria),
             }
         )
     if args.repro_steps is not None:
@@ -124,7 +125,7 @@ def build_patch_document(args: argparse.Namespace) -> List[Dict[str, Any]]:
             {
                 "op": "add",
                 "path": f"/fields/{FIELD_ALIASES['repro_steps']}",
-                "value": args.repro_steps,
+                "value": to_ado_html(args.repro_steps),
             }
         )
     if args.system_info is not None:
@@ -132,7 +133,7 @@ def build_patch_document(args: argparse.Namespace) -> List[Dict[str, Any]]:
             {
                 "op": "add",
                 "path": f"/fields/{FIELD_ALIASES['system_info']}",
-                "value": args.system_info,
+                "value": to_ado_html(args.system_info),
             }
         )
 
@@ -160,13 +161,13 @@ def build_requested_changes(args: argparse.Namespace) -> Dict[str, Any]:
     if args.assigned_to is not None:
         changes[FIELD_ALIASES["assigned_to"]] = args.assigned_to
     if args.description is not None:
-        changes[FIELD_ALIASES["description"]] = args.description
+        changes[FIELD_ALIASES["description"]] = to_ado_html(args.description)
     if args.acceptance_criteria is not None:
-        changes[FIELD_ALIASES["acceptance_criteria"]] = args.acceptance_criteria
+        changes[FIELD_ALIASES["acceptance_criteria"]] = to_ado_html(args.acceptance_criteria)
     if args.repro_steps is not None:
-        changes[FIELD_ALIASES["repro_steps"]] = args.repro_steps
+        changes[FIELD_ALIASES["repro_steps"]] = to_ado_html(args.repro_steps)
     if args.system_info is not None:
-        changes[FIELD_ALIASES["system_info"]] = args.system_info
+        changes[FIELD_ALIASES["system_info"]] = to_ado_html(args.system_info)
     for raw_field in args.field:
         field_name, value = parse_field_assignment(raw_field)
         changes[field_name] = value

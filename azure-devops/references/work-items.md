@@ -54,6 +54,7 @@ Supported create flags:
 - `--type`
 - `--title`
 - `--description`
+- `--acceptance-criteria` - Microsoft.VSTS.Common.AcceptanceCriteria; set this on every User Story/PBI item, it does not default to anything
 - `--assigned-to`
 - repeated `--field NAME=VALUE`
 
@@ -61,4 +62,27 @@ Example:
 
 ```powershell
 python scripts/work-item-create.py --backend rest --type Bug --title "Example bug" --field Microsoft.VSTS.Common.Priority=1
+```
+
+`--description`, `--acceptance-criteria`, `--repro-steps`, and `--system-info` are all HTML
+rich-text fields in Azure DevOps — a literal `\n` renders as nothing in the work item UI, so
+raw plain text collapses into one run-on block. Pass plain text with real blank lines between
+paragraphs and `- `/`* ` for bullet lines; both scripts auto-convert that into `<p>`/`<br>`/`<ul>`
+HTML before sending it. If you already have HTML, pass it as-is — text containing `<` is sent
+through unchanged.
+
+#### `scripts/work-item-delete.py`
+Deletes a work item through REST. Use this to remove a work item created by mistake (for
+example, a duplicate or an item created while testing).
+
+Supported flags:
+- `--id`
+- `--destroy` - permanently destroy the item instead of moving it to the project recycle bin.
+  Irreversible; omit this unless you are certain. Without it, the item is soft-deleted and can
+  be restored from the recycle bin.
+
+Example:
+
+```powershell
+python scripts/work-item-delete.py --backend rest --id 55863
 ```
