@@ -37,30 +37,29 @@ For detailed usage, see:
 
 ### build-docx Skill
 
-Generates a DOCX file from structured content, a template, or a description — detects the project stack, picks the right library, and writes a self-contained builder script.
+Converts GitHub-flavored Markdown to a Word document with a single bundled, schema-validated converter (Markdig + the OpenXML SDK). Requires the .NET 10 SDK.
 
 **Location:** `build-docx/`
 
 **Key Features:**
-- Detect the project's language/stack and recommend the right library (`python-docx`, `docx` npm, or `DocumentFormat.OpenXml`/`DocX`)
-- Generate documents from a Markdown file, JSON/structured data, or a free-form description
-- Clone an existing DOCX template and fill in `{{placeholders}}`
-- Build tables, images, headings, and styled sections programmatically
+- Headings map to real Word *Heading* styles, and `#anchor` links jump to them
+- Nested/ordered/lettered/task lists with real Word numbering, block quotes, GitHub alerts, footnotes
+- Pipe and grid tables (alignment, repeating header row, colspan/rowspan), code blocks, images (PNG/JPEG/GIF/BMP, scaled to the page)
+- A safe subset of raw HTML; anything that can't be rendered produces a `warning:` instead of vanishing
+- Output is validated against the OpenXML schema and written atomically; local images are confined to an image root
 
 **Structure:**
-- `SKILL.md` - The skill definition and procedure
-- `references/` - Pattern references per library (`python-docx`, `docx` npm, `DocumentFormat.OpenXml`)
-- `scripts/detect_docx_stack.ps1` - Stack detection helper
+- `SKILL.md` - The skill definition, supported Markdown, and known degradations
+- `scripts/md2docx.cs` - The converter (a single-file .NET app)
 
 **Quick Start:**
 
-Detect the project's stack and recommended library:
-```powershell
-pwsh -File build-docx/scripts/detect_docx_stack.ps1 <project-root>
+```bash
+dotnet run build-docx/scripts/md2docx.cs -- report.md report.docx
 ```
 
 For detailed usage, see:
-- [build-docx SKILL.md](build-docx/SKILL.md) - Full workflow and library pattern references
+- [build-docx SKILL.md](build-docx/SKILL.md) - Options, exit codes, supported Markdown, and degradations
 
 ### sandbox-test Skill
 

@@ -1,125 +1,71 @@
 ---
 name: build-docx
-description: Generate a DOCX file from structured content, a template, or a description. Trigger when the user wants to produce a Word document, export content to .docx, fill in a DOCX template, or convert markdown/JSON/outline data to a formatted document.
+description: "Convert Markdown to a Word (.docx) document with a deterministic, schema-validated converter: GitHub-flavored Markdown including headings, nested and task lists, tables, code blocks, footnotes, images, alerts, and links. Trigger when the user wants a Word document or .docx, wants agent output (reports, specs, briefs, changelogs) exported to Word, or has a Markdown file to convert. If the content is only a description or outline, write it as Markdown first, then convert. Requires the .NET 10 SDK. Does not support templates, headers/footers, page numbers, or a table of contents."
+compatibility: "Requires the .NET 10 SDK (`dotnet`). The first run needs network access to restore two NuGet packages (Markdig, DocumentFormat.OpenXml)."
 ---
 
 # Build DOCX
 
-Detect the project stack, pick the right DOCX library, gather content requirements, generate the code to produce the file, run it, and report the output path.
+`scripts/md2docx.cs` converts Markdown to `.docx` (Markdig parser, OpenXML SDK writer). Use it as-is. Do not hand-write a Markdown parser or a `python-docx`/`docx` script: the converter already handles nesting, numbering, escaping, and Word's structural rules.
 
-## When to Use
+## Steps
 
-Use this skill when the user wants to:
-- Generate a Word document (`.docx`) from data, an outline, or a description
-- Export agent output — briefs, reports, changelogs, specs — to a DOCX file
-- Fill in a DOCX template with variable content
-- Convert a Markdown or JSON source into a formatted Word document
+1. **Get the content into a Markdown file.** If the user gave a description or outline, write the Markdown yourself first. Prefer local images referenced by relative path.
+2. **Run the converter** using absolute paths. The shell tool works on every fuseraft version:
 
-Do **not** use this skill for:
-- PDF generation (use a PDF skill or pipeline instead)
-- Editing an existing DOCX in place when a simple patch is sufficient — call `write_file` directly
-- Generating HTML or plain-text documents
+   ```bash
+   dotnet run <skill-dir>/scripts/md2docx.cs -- <input.md> [output.docx] [--page letter|a4] [--image-root DIR] [--strict]
+   ```
 
-## Workflow
+   `<skill-dir>` is this skill's directory (`~/.fuseraft/skills/build-docx` when installed globally). Recent fuseraft versions can instead run it with `run_skill_script`: script name `scripts/md2docx.cs` (the `scripts/` prefix is required) and the arguments as a string array. Older versions fail there because they cannot execute `.cs` files.
 
-### Step 1: Detect the Stack
+   The output defaults to the input path with `.docx`. The first run restores packages (about 15 s); later runs take about 1 s.
+3. **Read the result.** Stdout is `Wrote <path> (N paragraphs, N tables, N images, N footnotes)`. Every `warning:` line on stderr is a real degradation: fix the cause and re-run, or tell the user. Do not ignore them (see the table below).
+4. **Report** the absolute output path and any warnings you could not fix.
 
-Run the detection script to identify the project language and available DOCX libraries:
-
-```bash
-pwsh -File scripts/detect_docx_stack.ps1 <project-root>
-```
-
-Returns JSON with `language`, `available_libraries`, and `recommended`.
-
-If the script is unavailable, infer from project files:
-- `.csproj` / `.sln` → .NET → recommend `DocumentFormat.OpenXml` or `DocX`
-- `package.json` → Node.js → recommend `docx` (npm)
-- `pyproject.toml` / `requirements.txt` / `setup.py` → Python → recommend `python-docx`
-- `go.mod` → Go → recommend `unioffice` or shell out to a Python helper script
-- No match → default to a standalone Python helper script using `python-docx`
-
-### Step 2: Gather Content Requirements
-
-Ask these questions. Extract answers from the user's description if already provided.
-
-1. **Output path** — where should the `.docx` be written? Default: `output/<slug>.docx`
-2. **Content source** — is the content already in a file (Markdown, JSON, plain text), or should the skill generate it from a description?
-3. **Document structure** — which elements are needed?
-   - Title / subtitle
-   - Headings (H1, H2, H3)
-   - Paragraphs of body text
-   - Bulleted or numbered lists
-   - Tables (rows × columns)
-   - Images (file paths)
-   - Code blocks / monospace sections
-   - Page breaks
-4. **Styling** — should it match a corporate template? If yes, ask for the template `.docx` path (the library will clone its styles).
-5. **Variable substitution** — if a template is provided, does it contain `{{placeholders}}`? If yes, collect the variable map.
-
-### Step 3: Choose the Approach
-
-| Situation | Approach |
+| Exit | Meaning |
 |---|---|
-| Template `.docx` provided | Clone the template, replace placeholders, append dynamic sections |
-| Markdown source file | Parse headings/paragraphs/lists, map to document elements |
-| JSON / structured data | Iterate records, build tables or repeated sections |
-| Free-form description | Generate content inline, write directly to a new document |
+| 0 | Written (warnings possible). |
+| 1 | Bad usage or unreadable input. Read the `error:` line. |
+| 2 | Conversion or schema-validation failure. No output file is written. |
+| 3 | `--strict` and at least one warning. The file is still written. |
 
-### Step 4: Generate the Builder Code
+Use `--strict` when the document must be free of degradations.
 
-Write a self-contained script (Python helper preferred for portability; native language module otherwise) that:
+## Supported Markdown
 
-1. Accepts the output path and any data source as arguments or embedded constants.
-2. Creates or opens the document.
-3. Appends all required elements in order.
-4. Saves the file.
+| Element | Result in Word |
+|---|---|
+| Headings 1-6 (ATX and setext) | Real *Heading 1-6* styles (navigation pane, TOC-ready). `[x](#heading)` links jump to the heading. |
+| Bold, italic, `~~strike~~`, `==mark==`, `++ins++`, `~sub~`, `^sup^` | Run formatting, nestable. |
+| Inline code, fenced and indented code | Monospace, shaded; whitespace and tabs preserved. No syntax highlighting. |
+| Bullet, ordered, lettered/roman (`a.`, `i.`), `)` lists, start numbers | Real Word numbering, nested to any depth (indent is capped so text never collapses). |
+| Task lists `- [ ]` / `- [x]` | Checkbox glyphs. `[ ]` elsewhere in a line stays literal. |
+| Block quotes, nested; GitHub alerts (`> [!NOTE]`, `TIP`, `IMPORTANT`, `WARNING`, `CAUTION`) | Left-bar quotes; alerts get a colored title. |
+| Pipe and grid tables | Alignment, repeating header row, colspan/rowspan, inline formatting and images in cells, widths sized to content. |
+| Footnotes `[^1]` | Real Word footnotes. |
+| Images (PNG, JPEG, GIF, BMP; local files or `data:` URIs) | Embedded and scaled to the page. Linked images stay links. |
+| Links `http`, `https`, `mailto`, `tel`, `ftp`, relative | Hyperlinks; the title becomes the tooltip. |
+| Definition lists | Only Markdig syntax: `Term` then `:` followed by three spaces or a tab. |
+| YAML front matter | `title:` becomes the document title; the block is not rendered. |
+| Raw HTML | `b i u s sub sup code kbd mark a img br hr pre h1-h6 p div li details/summary` are honored, comments are dropped, and other tags are stripped but their text is kept. |
 
-**Python (`python-docx`) snippet reference — load `references/python-docx-patterns.md` for the full pattern library.**
+## What degrades
 
-**Node.js (`docx`) snippet reference — load `references/node-docx-patterns.md` for the full pattern library.**
+Nothing is silently dropped: each of these produces a `warning:` line, and images become an italic `[image: alt]` placeholder.
 
-**.NET (`DocumentFormat.OpenXml`) snippet reference — load `references/dotnet-openxml-patterns.md` for the full pattern library.**
+| Cause | Fix |
+|---|---|
+| Remote image (`http(s)://`) | Never downloaded. Download it and reference the local file. |
+| SVG, WebP, or other unsupported image | Convert to PNG or JPEG first. |
+| Missing image, or one outside the image root | Fix the path, or pass `--image-root` (default: the input file's directory). |
+| `#anchor` that matches no heading | Rendered as plain text. Fix the link (GitHub slugs keep `--` from `--json` and `read / write`). |
+| `javascript:` or another unsafe link scheme | Rendered as plain text. |
 
-Keep the script focused: one function per element type, one `main()` entry point that wires them together.
+Also not rendered: math (`$x^2$` stays literal), Mermaid and other diagram fences (they appear as code), and HTML attributes such as `align`. Custom templates, headers/footers, page numbers, and tables of contents are not supported. Say so rather than improvising a workaround.
 
-### Step 5: Install the Dependency (If Needed)
+## Guarantees
 
-Check whether the required library is already installed before running any install command.
-
-| Library | Check | Install |
-|---|---|---|
-| `python-docx` | `python3 -c "import docx"` | `pip install python-docx` |
-| `docx` (npm) | `node -e "require('docx')"` | `npm install docx` |
-| `DocumentFormat.OpenXml` | check `.csproj` for package ref | `dotnet add package DocumentFormat.OpenXml` |
-| `DocX` | check `.csproj` for package ref | `dotnet add package DocX` |
-
-If installation requires elevated permissions or is disallowed by policy, write a portable Python helper instead and call it via `shell_run`.
-
-### Step 6: Run the Builder
-
-Call `shell_run` to execute the script:
-
-```bash
-python3 scripts/build_docx.py  # or node build_docx.js, etc.
-```
-
-Capture stdout and stderr. If the command fails:
-- Check for missing imports → re-run Step 5.
-- Check for path errors → verify the output directory exists; create it with `mkdir -p` if needed.
-- Check for content errors (empty tables, missing image paths) → fix the script and retry.
-
-Do not exceed 3 retry attempts. If the document still fails to generate, report the error to the user with the full stderr output.
-
-### Step 7: Verify and Report
-
-1. Confirm the output file exists: `ls -lh <output-path>`
-2. Report the absolute path to the user.
-3. If the file is under 5 MB, offer to describe the document structure (element count by type).
-4. If a template was used, note any placeholders that were left unfilled.
-
-## References
-
-- `references/python-docx-patterns.md` — Common `python-docx` patterns: headings, tables, images, styles, template cloning
-- `references/node-docx-patterns.md` — Common `docx` (npm) patterns: Paragraph, Table, ImageRun, styles
-- `references/dotnet-openxml-patterns.md` — Common `DocumentFormat.OpenXml` patterns: body elements, table builder, style parts
+- The output is validated against the OpenXML schema before it is written, and written atomically, so a failure never leaves a truncated or corrupt `.docx`.
+- Characters XML forbids (stray control characters) are replaced, not fatal. CRLF, UTF-8 BOM, empty files, and very large documents are handled.
+- Local images are only embedded from under the image root, so a Markdown file cannot pull arbitrary files from elsewhere on disk into a document.
