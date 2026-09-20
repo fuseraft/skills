@@ -168,6 +168,36 @@ for c in tilix xterm kitty alacritty gnome-terminal konsole foot wezterm; do com
 For detailed usage, see:
 - [terminal-screenshot SKILL.md](terminal-screenshot/SKILL.md) - Full workflow and both safety rules
 
+### azure-devops Skill
+
+Work items, pull requests, repositories, and pipelines in Azure DevOps through a shared set of Python scripts. Works against both Azure DevOps Services and on-prem Azure DevOps Server, choosing between the `az` CLI and direct REST calls per operation.
+
+**Location:** `azure-devops/`
+
+**Key Features:**
+- Work items: create (with acceptance criteria), get, query, update fields/state, comment, list comments, delete
+- Pull requests: list, get, and comment; repositories: list and code search
+- Pipelines: list and filter runs by pipeline, branch, state, and result
+- Consistent `--backend auto|cli|rest` selection, with REST as the dependable path for on-prem collections
+- Configured through `ADO_URL`, `ADO_PROJECT`, `ADO_PAT`, and optional `ADO_REPO`
+
+**Structure:**
+- `SKILL.md` - The skill definition, environment contract, and backend strategy
+- `README.md` - Script usage and examples
+- `references/` - Per-area script references (work items, pull requests, repositories, pipelines, foundation)
+- `scripts/` - The Python scripts and their shared `_ado_common.py`
+
+**Quick Start:**
+
+Check the environment and CLI/REST prerequisites:
+```bash
+python3 azure-devops/scripts/check-ado-prereqs.py
+```
+
+For detailed usage, see:
+- [azure-devops SKILL.md](azure-devops/SKILL.md) - Scope, environment, and backend strategy
+- [azure-devops README](azure-devops/README.md) - Script usage and examples
+
 ## Development
 
 Each skill follows the structure:
