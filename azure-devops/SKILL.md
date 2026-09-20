@@ -7,14 +7,14 @@ compatibility: Requires Windows PowerShell 5.1 or PowerShell 7+ (pwsh). No other
 # azure-devops
 
 ## Purpose
-Use Azure DevOps tools and APIs to help with common engineering workflow tasks such as managing work items, inspecting and acting on pull requests, and reviewing or queueing pipeline runs.
+Use Azure DevOps tools and APIs to help with common engineering workflow tasks such as managing work items, inspecting and acting on pull requests, and reviewing pipeline runs.
 
 ## Scope
 This skill covers:
 - Azure DevOps authentication and CLI setup
 - Work item creation, updates, queries, and links
 - Pull request inspection and common PR actions
-- Pipeline listing, run inspection, and run queueing
+- Pipeline run inspection (listing and filtering runs)
 - Guidance on when to use Azure DevOps CLI versus REST API
 
 ## Out of scope
@@ -22,6 +22,7 @@ This version does not cover:
 - Wiki operations
 - Artifacts or package feeds
 - Release management
+- Queueing pipeline runs, or listing pipeline definitions
 - Test plans
 - Custom reporting or dashboards
 - General git tasks outside Azure DevOps-specific workflows
@@ -90,4 +91,4 @@ JSON output is pure ASCII (non-ASCII text is `\u`-escaped), so it survives any c
 - Pull requests: `pr-list.ps1`, `pr-get.ps1`, `pr-comment.ps1`
 - Pipelines: `pipeline-runs.ps1`
 
-Full parameter references and examples for each script are in `references/`: `references/foundation.md`, `references/work-items.md`, `references/repositories.md`, `references/pull-requests.md`, and `references/pipelines.md`. Work item linking and attachment support are not yet implemented.
+Full parameter references and examples for each script are in `references/`: `references/foundation.md`, `references/work-items.md`, `references/repositories.md`, `references/pull-requests.md`, and `references/pipelines.md`. Work item linking and attachment support, and queueing pipeline runs, are not yet implemented.

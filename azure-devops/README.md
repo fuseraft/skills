@@ -28,13 +28,14 @@ This version of the skill focuses on:
 - authentication and context resolution
 - work item operations
 - pull request inspection and common actions
-- pipeline inspection and queueing
+- pipeline run inspection (listing and filtering runs)
 - choosing between Azure DevOps CLI and REST backends
 
 This version does not currently target:
 - wiki operations
 - package feeds or artifacts
 - releases
+- queueing pipeline runs or listing pipeline definitions
 - test plans
 - dashboards or reporting
 

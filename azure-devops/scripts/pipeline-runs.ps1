@@ -1,18 +1,22 @@
 <#
 .SYNOPSIS
-Lists Azure DevOps pipeline runs through REST.
+Lists Azure DevOps pipeline runs through REST (the Builds API, so YAML and classic pipelines).
+
+.DESCRIPTION
+When more results are available the response includes continuation_token; pass it back with
+-ContinuationToken to fetch the next page.
 
 .PARAMETER PipelineId
-Filter by pipeline ID.
+Filter by pipeline (build definition) ID.
 
 .PARAMETER Branch
 Filter by branch ref, for example refs/heads/main.
 
 .PARAMETER Result
-Filter by run result.
+Filter by run result: succeeded, partiallySucceeded, failed, canceled, or none.
 
 .PARAMETER State
-Filter by run state.
+Filter by run status: inProgress, completed, cancelling, postponed, notStarted, or all.
 
 .PARAMETER Top
 Maximum number of runs to return (default 25).
@@ -66,16 +70,19 @@ try {
     $resolvedBackend = Resolve-AdoBackend -Requested $Backend -Availability $availability -Supported 'rest'
     if ($resolvedBackend -ne 'rest') { throw (New-AdoError 'pipeline-runs.ps1 currently supports only the REST backend') }
 
+    # The Pipelines "Runs - List" API needs a pipeline id in the path and takes no filters, so run
+    # listing goes through the Builds API (YAML and classic pipelines, Services and Server), whose
+    # query parameters match this script's flags.
     $query = [ordered]@{
         '$top'            = $Top
-        branch            = (Get-AdoBoundValue $PSBoundParameters 'Branch')
-        result            = (Get-AdoBoundValue $PSBoundParameters 'Result')
-        state             = (Get-AdoBoundValue $PSBoundParameters 'State')
+        branchName        = (Get-AdoBoundValue $PSBoundParameters 'Branch')
+        resultFilter      = (Get-AdoBoundValue $PSBoundParameters 'Result')
+        statusFilter      = (Get-AdoBoundValue $PSBoundParameters 'State')
         continuationToken = (Get-AdoBoundValue $PSBoundParameters 'ContinuationToken')
     }
-    if ($PSBoundParameters.ContainsKey('PipelineId')) { $query['pipelineIds'] = $PipelineId }
+    if ($PSBoundParameters.ContainsKey('PipelineId')) { $query['definitions'] = $PipelineId }
 
-    $response = Invoke-AdoRest -Context $context -Method GET -Path '_apis/pipelines/runs' -Project $context['project'] -Query $query
+    $response = Invoke-AdoRest -Context $context -Method GET -Path '_apis/build/builds' -Project $context['project'] -Query $query
 
     $data = $response['data']
     if ($null -eq $data) { $data = [ordered]@{} }
@@ -86,6 +93,7 @@ try {
         context   = (New-AdoContextPayload -Context $context -Availability $availability -RequestedBackend $resolvedBackend -Detail:$detail)
         request   = $query
         count     = (Get-AdoItem $data 'count' (@($runs).Count))
+        continuation_token = (Get-AdoItem $response['headers'] 'x-ms-continuationtoken')
         runs      = $runs
     }
     if ($detail) { $payload['rest'] = [ordered]@{ status_code = $response['status_code']; url = $response['url'] } }

@@ -721,7 +721,7 @@ function Get-AdoInnermostMessage {
 }
 
 function Invoke-AdoRest {
-    <# Sends one REST call and returns @{ status_code; url; data }. Non-2xx and transport failures throw an Ado error. #>
+    <# Sends one REST call and returns @{ status_code; url; data; headers }. Non-2xx and transport failures throw an Ado error. #>
     param(
         [Parameter(Mandatory = $true)][System.Collections.IDictionary]$Context,
         [Parameter(Mandatory = $true)][string]$Method,
@@ -758,6 +758,8 @@ function Invoke-AdoRest {
             $response = $client.SendAsync($request).GetAwaiter().GetResult()
             $statusCode = [int]$response.StatusCode
             $rawBytes = $response.Content.ReadAsByteArrayAsync().GetAwaiter().GetResult()
+            $responseHeaders = [ordered]@{}
+            foreach ($header in $response.Headers) { $responseHeaders[$header.Key.ToLowerInvariant()] = ($header.Value -join ', ') }
         }
         catch {
             throw (New-AdoError ('Azure DevOps REST request failed: ' + (Get-AdoInnermostMessage -Exception $_.Exception)))
@@ -786,5 +788,5 @@ function Invoke-AdoRest {
             throw (New-AdoError ('Azure DevOps REST response (status ' + $statusCode + ') was not valid JSON; check the organization URL and PAT. Response began: ' + $preview))
         }
     }
-    return [ordered]@{ status_code = $statusCode; url = $url; data = $data }
+    return [ordered]@{ status_code = $statusCode; url = $url; data = $data; headers = $responseHeaders }
 }
