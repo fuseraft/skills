@@ -2,7 +2,7 @@
 
 Full reference for the foundation scripts in `scripts/`. See the top-level `README.md` for environment variables and common flags shared across all scripts.
 
-#### `scripts/check-ado-prereqs.py`
+#### `scripts/check-ado-prereqs.ps1`
 Checks whether the environment is ready for CLI and/or REST usage.
 
 What it reports:
@@ -20,11 +20,11 @@ What it reports:
 Examples:
 
 ```powershell
-python scripts/check-ado-prereqs.py --output json
-python scripts/check-ado-prereqs.py --org https://ado.contoso.mil/tfs/DefaultCollection --project MyProject --backend rest --output table
+pwsh -File scripts/check-ado-prereqs.ps1 -Output json
+pwsh -File scripts/check-ado-prereqs.ps1 -Org https://ado.contoso.mil/tfs/DefaultCollection -Project MyProject -Backend rest -Output table
 ```
 
-#### `scripts/show-ado-context.py`
+#### `scripts/show-ado-context.ps1`
 Shows the resolved execution context that downstream scripts will use.
 
 What it reports:
@@ -39,6 +39,6 @@ What it reports:
 Examples:
 
 ```powershell
-python scripts/show-ado-context.py --output json
-python scripts/show-ado-context.py --org https://ado.contoso.mil/tfs/DefaultCollection --project MyProject --repo MyRepo --backend auto --verbose --output table
+pwsh -File scripts/show-ado-context.ps1 -Output json
+pwsh -File scripts/show-ado-context.ps1 -Org https://ado.contoso.mil/tfs/DefaultCollection -Project MyProject -Repo MyRepo -Backend auto -Verbose -Output table
 ```

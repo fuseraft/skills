@@ -170,7 +170,7 @@ For detailed usage, see:
 
 ### azure-devops Skill
 
-Work items, pull requests, repositories, and pipelines in Azure DevOps through a shared set of Python scripts. Works against both Azure DevOps Services and on-prem Azure DevOps Server, choosing between the `az` CLI and direct REST calls per operation.
+Work items, pull requests, repositories, and pipelines in Azure DevOps through a shared set of PowerShell scripts (Windows PowerShell 5.1 or PowerShell 7+, no other runtime). Works against both Azure DevOps Services and on-prem Azure DevOps Server through the REST API; an `az` CLI backend is planned.
 
 **Location:** `azure-devops/`
 
@@ -178,20 +178,20 @@ Work items, pull requests, repositories, and pipelines in Azure DevOps through a
 - Work items: create (with acceptance criteria), get, query, update fields/state, comment, list comments, delete
 - Pull requests: list, get, and comment; repositories: list and code search
 - Pipelines: list and filter runs by pipeline, branch, state, and result
-- Consistent `--backend auto|cli|rest` selection, with REST as the dependable path for on-prem collections
+- Consistent `-Backend auto|cli|rest` selection, with REST as the dependable path for on-prem collections
 - Configured through `ADO_URL`, `ADO_PROJECT`, `ADO_PAT`, and optional `ADO_REPO`
 
 **Structure:**
 - `SKILL.md` - The skill definition, environment contract, and backend strategy
 - `README.md` - Script usage and examples
 - `references/` - Per-area script references (work items, pull requests, repositories, pipelines, foundation)
-- `scripts/` - The Python scripts and their shared `_ado_common.py`
+- `scripts/` - The PowerShell scripts and their shared `_ado_common.ps1`
 
 **Quick Start:**
 
 Check the environment and CLI/REST prerequisites:
-```bash
-python3 azure-devops/scripts/check-ado-prereqs.py
+```powershell
+pwsh -File azure-devops/scripts/check-ado-prereqs.ps1
 ```
 
 For detailed usage, see:

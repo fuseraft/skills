@@ -1,6 +1,7 @@
 ---
 name: azure-devops
 description: Help agents perform common Azure DevOps tasks for work items, pull requests, and pipelines using reliable CLI and REST workflows.
+compatibility: Requires Windows PowerShell 5.1 or PowerShell 7+ (pwsh). No other runtime is needed.
 ---
 
 # azure-devops
@@ -35,7 +36,20 @@ Prefer these environment variables as the default contract for scripts in this s
 - `ADO_PROJECT`: Default Azure DevOps project name
 - `ADO_REPO`: Optional default repository name for pull request operations
 
-Scripts may also accept explicit command-line flags to override environment values.
+Scripts may also accept explicit parameters to override environment values.
+
+## Running the scripts
+The scripts are PowerShell (`.ps1`) and run on Windows PowerShell 5.1 or PowerShell 7+. Call them with `-File` and named parameters:
+
+```powershell
+pwsh -File scripts/work-item-get.ps1 -Id 48520
+powershell -File scripts\work-item-get.ps1 -Id 48520     # Windows PowerShell 5.1
+```
+
+- Parameters are PascalCase (`-Id`, `-Project`, `-Output`). Quote values that contain spaces; a value may start with `-` or contain newlines.
+- Options that used to repeat take a quoted, comma-separated list instead: `-Field "A=1,B=2"`, `-Repo "A,B"`. Quote it so it arrives as one string from any shell. A `-Field` value that itself contains a comma is fine as long as the text after the comma does not look like `NAME=`.
+- A missing required parameter exits with code 2; a handled failure prints a JSON `error` and exits with code 1.
+- Via `run_skill_script`, use the script name `scripts/<name>.ps1` and pass the parameters as a string array, for example `["-Id", "48520"]`.
 
 ## Backend strategy
 Scripts should support a consistent backend selection rule:
@@ -50,14 +64,14 @@ Use the CLI when it provides clear support for the requested operation. Use REST
 - pull request thread or comment behavior is easier or more reliable through REST
 - the environment uses Azure DevOps Server/on-prem collection URLs where direct REST calls are the more dependable path
 
-## Common flags
-Use a shared argument surface across scripts where relevant:
-- `--org <url>`: Azure DevOps organization or collection URL
-- `--project <name>`: Azure DevOps project name
-- `--repo <name>`: repository name for pull request operations
-- `--backend <auto|cli|rest>`: backend selection mode
-- `--output <json|table|tsv>`: output format, default `json`
-- `--verbose`: include backend and request detail in output or logs
+## Common parameters
+Use a shared parameter surface across scripts where relevant:
+- `-Org <url>`: Azure DevOps organization or collection URL
+- `-Project <name>`: Azure DevOps project name
+- `-Repo <name>`: repository name for pull request operations
+- `-Backend <auto|cli|rest>`: backend selection mode
+- `-Output <json|table|tsv>`: output format, default `json`
+- `-Verbose`: include backend and request detail in output or logs
 
 ## Output conventions
 For v1, scripts should aim to:
@@ -66,12 +80,14 @@ For v1, scripts should aim to:
 - emit clear error messages that identify whether setup, auth, backend selection, or Azure DevOps API behavior caused the failure
 - keep output stable enough for one script result to feed another step
 
+JSON output is pure ASCII (non-ASCII text is `\u`-escaped), so it survives any console code page; `table` and `tsv` print the text as-is.
+
 ## Available scripts
 
-- Foundation: `check-ado-prereqs.py`, `show-ado-context.py`
-- Work items: `work-item-get.py`, `work-item-query.py`, `work-item-create.py`, `work-item-update.py`, `work-item-delete.py`, `work-item-comment.py`, `work-item-comment-list.py`
-- Repositories and code search: `repo-list.py`, `code-search.py`
-- Pull requests: `pr-list.py`, `pr-get.py`, `pr-comment.py`
-- Pipelines: `pipeline-runs.py`
+- Foundation: `check-ado-prereqs.ps1`, `show-ado-context.ps1`
+- Work items: `work-item-get.ps1`, `work-item-query.ps1`, `work-item-create.ps1`, `work-item-update.ps1`, `work-item-delete.ps1`, `work-item-comment.ps1`, `work-item-comment-list.ps1`
+- Repositories and code search: `repo-list.ps1`, `code-search.ps1`
+- Pull requests: `pr-list.ps1`, `pr-get.ps1`, `pr-comment.ps1`
+- Pipelines: `pipeline-runs.ps1`
 
-Full flag references and examples for each script are in `references/`: `references/foundation.md`, `references/work-items.md`, `references/repositories.md`, `references/pull-requests.md`, and `references/pipelines.md`. Work item linking and attachment support are not yet implemented.
+Full parameter references and examples for each script are in `references/`: `references/foundation.md`, `references/work-items.md`, `references/repositories.md`, `references/pull-requests.md`, and `references/pipelines.md`. Work item linking and attachment support are not yet implemented.
