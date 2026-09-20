@@ -1,6 +1,30 @@
 # Skills Repository
 
-This repository contains reusable, project-agnostic skills for the fuseraft Agent Skills ecosystem — database operations, document generation, commits, sandboxed experimentation, data-flow mapping, and more.
+This repository contains reusable skills for the fuseraft Agent Skills ecosystem — database operations, document generation, commits, sandboxed experimentation, data-flow mapping, terminal screenshots, and Azure DevOps. Most are stack-neutral; a few are tied to a language or platform, which the table below and each section call out.
+
+## Skills at a glance
+
+| Skill | What it does | Requires |
+| ----- | ------------ | -------- |
+| [dbconnect](#dbconnect-skill) | Test connectivity, inspect schema, and run guarded SQL against SQL Server or Oracle | .NET 10 SDK to build the CLI; the wrappers call `dbconnect.exe` (Windows) |
+| [build-docx](#build-docx-skill) | Convert GitHub-flavored Markdown to a Word document | .NET 10 SDK |
+| [sandbox-test](#sandbox-test-skill) | Verify a .NET change in a throwaway console harness before touching production code | .NET SDK, PowerShell |
+| [commit](#commit-skill) | Stage and commit with a conventional-commit message | git |
+| [datamap](#datamap-skill) | Map data flow through a C# codebase to a validated JSONL data map and CSV | PowerShell 5.1+ |
+| [terminal-screenshot](#terminal-screenshot-skill) | Capture a real terminal screenshot on an isolated display | Linux/X11: Xvfb, tmux, wmctrl, ImageMagick, a GTK terminal |
+| [azure-devops](#azure-devops-skill) | Work items, pull requests, repositories, and pipeline runs in Azure DevOps | PowerShell 5.1+ or 7+, a personal access token |
+
+## Using a skill
+
+Each directory is a self-contained skill: a `SKILL.md` plus optional `references/` and `scripts/`. To make one available to fuseraft agents, install it from a clone of this repository:
+
+```bash
+fuseraft skills add azure-devops       # copies the skill into ~/.fuseraft/skills and indexes it
+fuseraft skills list                   # show installed skills
+fuseraft skills validate azure-devops  # check SKILL.md against the Agent Skills specification
+```
+
+A skill can also be used per project by placing it under `.agents/skills/` (or `.fuseraft/skills/`) in that project's directory.
 
 ## Contents
 
@@ -11,11 +35,11 @@ A skill for database connectivity testing, schema inspection, and SQL execution 
 **Location:** `dbconnect/`
 
 **Key Features:**
-- Test SQL Server or Oracle connectivity
-- List named database connections
-- Inspect database schema
-- Execute SQL files including migrations
-- Export query results to CSV
+- Test SQL Server or Oracle (Kerberos) connectivity, with named connections kept in `*.connections` files
+- Inspect database schema and run SQL text or SQL files, including migrations (SQL Server `GO` batch separators are split and run as separate batches)
+- Read-only by default: INSERT/UPDATE/DELETE/MERGE/DDL/EXEC are blocked before a connection is opened unless `--allow-write` is passed
+- Console output is capped at 200 rows (`--max-rows`); CSV exports (`--output`) are never truncated
+- `--format table|json` output and a `--timeout` command timeout in seconds
 
 **Structure:**
 - `SKILL.md` - The skill definition and procedure
@@ -90,12 +114,12 @@ For detailed usage, see:
 
 ### commit Skill
 
-Stages and commits changes using the conventional commit format (`type: description`, imperative mood, staged files named explicitly — never `git add -A`).
+Stages and commits changes using the conventional commit format (`type: description` or `type(scope): description`, imperative mood, staged files named explicitly — never `git add -A`).
 
 **Location:** `commit/`
 
 **Key Features:**
-- Enforces `type: description` subject lines (≤ 72 characters, imperative mood, no trailing period)
+- Enforces conventional subject lines (≤ 72 characters, imperative mood, no trailing period)
 - Writes a body only when the change is non-trivial, explaining *why* rather than restating the diff
 - Stages only the files that belong to the change — never `git add -A` or `git add .`
 - Verifies the resulting commit before reporting it back
@@ -127,7 +151,7 @@ Maps data flow through a C# codebase from source (executed SQL via ADO.NET/Dappe
 
 **Structure:**
 - `SKILL.md` - The four-pass workflow (generate → validate → annotate → validate → convert)
-- `references/` - Schema conventions, C# detection patterns (ADO.NET/Dapper/HttpClient/EPPlus/SSH.NET/Graph/etc.), notes-writing guidance, and a full worked example
+- `references/` - The JSONL schema and field conventions, C# detection patterns (ADO.NET/Dapper/HttpClient/EPPlus/SSH.NET/Graph/etc.), and notes-writing guidance
 - `scripts/` - PowerShell 5.1-compatible scripts to append, validate, annotate, and convert the datamap
 
 **Quick Start:**
@@ -145,7 +169,7 @@ For detailed usage, see:
 
 ### terminal-screenshot Skill
 
-Captures a real screenshot of an actual terminal application running real commands — not an HTML/CSS mockup — on an isolated virtual display that never touches the user's real desktop or real settings. Linux/X11 only.
+Captures a real screenshot of an actual terminal application running real commands — not an HTML/CSS mockup — on an isolated virtual display that never touches the user's real desktop or real settings. Linux/X11 only: it needs Xvfb, tmux, wmctrl, ImageMagick, and a GTK/X11 terminal emulator (tilix is the verified one).
 
 **Location:** `terminal-screenshot/`
 
@@ -201,6 +225,11 @@ For detailed usage, see:
 ## Development
 
 Each skill follows the structure:
-- **SKILL.md** - Skill metadata, triggers, procedure, and rules
+- **SKILL.md** - Skill metadata (`name`, `description`, and optionally `compatibility` in the frontmatter), triggers, procedure, and rules
 - **references/** - Supporting documentation
 - **scripts/** - Executable wrappers and helper scripts
+
+Conventions:
+- Check a skill with `fuseraft skills validate <skill-directory>` before committing it.
+- PowerShell scripts are written to run on Windows PowerShell 5.1 as well as PowerShell 7+ (see `datamap` and `azure-devops`): no ternary or `??` operators, and ASCII-only source, since 5.1 reads BOM-less UTF-8 files as ANSI.
+- Commits use the conventional-commit format described in the [commit skill](commit/SKILL.md).
