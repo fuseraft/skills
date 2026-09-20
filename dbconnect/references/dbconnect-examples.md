@@ -24,5 +24,11 @@
 ## Large result set, cap console preview
 `powershell -ExecutionPolicy Bypass -File scripts\dbconnect-run.ps1 --use SqlServer_Prod --sql "SELECT * FROM dbo.BigTable" --max-rows 50`
 
+## Machine-readable results (JSON)
+`powershell -ExecutionPolicy Bypass -File scripts\dbconnect-run.ps1 --use SqlServer_Prod --sql "SELECT TOP 5 * FROM dbo.MyTable" --format json`
+
+## Long-running query with a 5-minute timeout
+`powershell -ExecutionPolicy Bypass -File scripts\dbconnect-run.ps1 --use SqlServer_Prod --sql "SELECT COUNT(*) FROM dbo.BigTable" --timeout 300`
+
 ## Large result set, export everything (no truncation)
 `powershell -ExecutionPolicy Bypass -File scripts\dbconnect-run.ps1 --use SqlServer_Prod --sql "SELECT * FROM dbo.BigTable" --output big-table.csv`

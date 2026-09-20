@@ -21,8 +21,10 @@ PS> .\build.ps1
 | `--list` | List available connections. |
 | `--sql "sql statements;"` | SQL text to execute. |
 | `--sql <file_name>` | Execute SQL from a file. SQL Server input is split on lines containing only `GO` and run as separate batches. |
-| `--output <file_name>` | Write results to a CSV file. CSV exports are never truncated by `--max-rows`. |
-| `--max-rows <n>` | Cap console table output at `n` rows (default 200). Does not affect `--output` CSV exports. |
+| `--output <file_name>` | Write results to a file: CSV by default, or JSON when `--format json` is set. File exports are never truncated by `--max-rows`. |
+| `--format <table\|json>` | Output format (default `table`). `json` prints, or writes to `--output`, an object with `rowCount`, `truncated`, and `rows` (an array of column-name/value objects). |
+| `--max-rows <n>` | Cap console output (table or JSON) at `n` rows (default 200). Does not affect `--output` exports. |
+| `--timeout <seconds>` | Command timeout in seconds, applied to each SQL batch. `0` means no timeout; omit it to use the database driver's default. Negative values are rejected. |
 | `--allow-write` | Permit INSERT/UPDATE/DELETE/MERGE/DDL statements. Without it, dbconnect blocks write statements before opening a connection. |
 
 ## Connections

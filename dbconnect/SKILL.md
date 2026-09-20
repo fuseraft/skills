@@ -10,13 +10,14 @@ description: Use dbconnect.exe to validate connectivity, inspect schema, run SQL
 - Need to list named connections from a `.connections` file.
 - Need to inspect schema or run ad hoc SQL.
 - Need to execute SQL files such as migrations.
-- Need query output written to CSV.
+- Need query output written to CSV or JSON.
 
 ## Inputs to gather
 - Target DB type: `mssql` or `oracle`
 - Either `--conn` string or named connection for `--use`
 - SQL text or path to `.sql` file
-- Optional CSV output path
+- Optional output path (CSV by default, or JSON with `--format json`)
+- Optional `--format json` when another tool will parse the results, and `--timeout <seconds>` for long-running queries (`0` disables the timeout; omitted uses the driver default)
 - Whether the SQL writes data (INSERT/UPDATE/DELETE/MERGE/DDL/EXEC) — if so, confirm intent with the user before adding `--allow-write`
 
 ## Procedure
@@ -26,7 +27,7 @@ description: Use dbconnect.exe to validate connectivity, inspect schema, run SQL
 4. For a connectivity check, run a trivial query like `SELECT 1` using the right wrapper.
 5. For schema inspection, use the schema query pattern in `references/dbconnect-examples.md`.
 6. For migrations or other file-based SQL, execute the `.sql` file path through the wrapper. SQL Server files may contain `GO` batch separators; dbconnect splits and runs them as separate batches automatically.
-7. If results must be preserved, pass an output CSV path — this also bypasses the console `--max-rows` cap. For large ad hoc queries without `--output`, either add `--max-rows <n>` or expect console output truncated at 200 rows by default.
+7. If results must be preserved, pass an output path (CSV by default, JSON with `--format json`) — this also bypasses the console `--max-rows` cap. For large ad hoc queries without `--output`, either add `--max-rows <n>` or expect console output truncated at 200 rows by default; with `--format json` the truncation is reported as `"truncated": true` rather than a printed notice.
 8. Return the exact command run, summarize results, and call out any prerequisite failures.
 
 ## Rules
