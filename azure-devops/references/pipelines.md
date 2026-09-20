@@ -1,6 +1,6 @@
 # Pipeline scripts
 
-Full reference for the pipeline scripts in `scripts/`. All scripts currently require `-Backend rest`. `auto` resolves to `rest` only when the Azure CLI (`az`) is not installed, so pass `-Backend rest` on machines that have it. See the top-level `README.md` for environment variables and common flags shared across all scripts.
+Full reference for the pipeline scripts in `scripts/`. All scripts currently require `-Backend rest` (or `auto`, which resolves to `rest`). See the top-level `README.md` for environment variables and common flags shared across all scripts.
 
 #### `scripts/pipeline-runs.ps1`
 Lists Azure DevOps pipeline runs through REST.

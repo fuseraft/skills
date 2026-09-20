@@ -53,7 +53,7 @@ $Output = $Output.ToLowerInvariant()
 try {
     $context = Resolve-AdoContext -Org $Org -Project $Project
     $availability = Get-AdoBackendAvailability -Context $context
-    $resolvedBackend = Resolve-AdoBackend -Requested $Backend -Availability $availability
+    $resolvedBackend = Resolve-AdoBackend -Requested $Backend -Availability $availability -Supported 'rest'
     if ($resolvedBackend -ne 'rest') { throw (New-AdoError 'work-item-delete.ps1 currently supports only the REST backend') }
 
     $query = $null

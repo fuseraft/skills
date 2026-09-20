@@ -74,7 +74,7 @@ try {
     if (-not (Test-AdoValue $context['repo'])) { throw (New-AdoError 'Missing required repository name; pass -Repo or set ADO_REPO') }
 
     $availability = Get-AdoBackendAvailability -Context $context
-    $resolvedBackend = Resolve-AdoBackend -Requested $Backend -Availability $availability
+    $resolvedBackend = Resolve-AdoBackend -Requested $Backend -Availability $availability -Supported 'rest'
     if ($resolvedBackend -ne 'rest') { throw (New-AdoError 'pr-list.ps1 currently supports only the REST backend') }
 
     $statusFilter = $Status
@@ -90,7 +90,7 @@ try {
     }
 
     $response = Invoke-AdoRest -Context $context -Method GET -Project $context['project'] `
-        -Path ('_apis/git/repositories/' + $context['repo'] + '/pullrequests') -Query $query
+        -Path ('_apis/git/repositories/' + (ConvertTo-AdoQuote -Text $context['repo']) + '/pullrequests') -Query $query
 
     $data = $response['data']
     if ($null -eq $data) { $data = [ordered]@{} }

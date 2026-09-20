@@ -307,11 +307,16 @@ function Get-AdoBackendAvailability {
 }
 
 function Resolve-AdoBackend {
+    <# -Supported lists the backends the calling script implements, so 'auto' never picks one it cannot run. #>
     param(
         [Parameter(Mandatory = $true)][string]$Requested,
-        [Parameter(Mandatory = $true)][System.Collections.IDictionary]$Availability
+        [Parameter(Mandatory = $true)][System.Collections.IDictionary]$Availability,
+        [string[]]$Supported
     )
     if ($Requested -eq 'auto') {
+        foreach ($candidate in @($Availability['available'])) {
+            if ($Supported -contains $candidate) { return [string]$candidate }
+        }
         if (-not (Test-AdoValue $Availability['preferred'])) { throw (New-AdoError 'No usable Azure DevOps backend is available') }
         return [string]$Availability['preferred']
     }
@@ -588,6 +593,8 @@ function ConvertTo-AdoHtml {
     #>
     param([string]$Text)
     if ($null -eq $Text -or $Text.Contains('<')) { return $Text }
+    # Blank-line paragraphs must survive Windows (CRLF) and old-Mac (CR) line endings.
+    $Text = $Text.Replace("`r`n", "`n").Replace("`r", "`n")
 
     $lineBreak = "\r\n|[\n\r\v\f\x1c\x1d\x1e\x85" + [char]0x2028 + [char]0x2029 + ']'
     $result = New-Object System.Text.StringBuilder

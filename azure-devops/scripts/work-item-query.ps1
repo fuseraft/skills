@@ -53,7 +53,7 @@ $context = Resolve-AdoContext -Org $Org -Project $Project
 $availability = Get-AdoBackendAvailability -Context $context
 
 try {
-    $resolvedBackend = Resolve-AdoBackend -Requested $Backend -Availability $availability
+    $resolvedBackend = Resolve-AdoBackend -Requested $Backend -Availability $availability -Supported 'rest'
     if ($resolvedBackend -ne 'rest') { throw (New-AdoError 'This script currently supports only the REST backend') }
 
     $payload = New-AdoContextPayload -Context $context -Availability $availability -RequestedBackend $Backend -Detail:$detail

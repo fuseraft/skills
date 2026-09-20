@@ -87,7 +87,7 @@ try {
     if (($hasStart -or $hasEnd) -and -not $hasFile) {
         throw (New-AdoError '-FilePath is required when specifying line-based thread context')
     }
-    if (-not ($hasFile -and -not $hasStart -and -not $hasEnd)) {
+    if ($hasStart -or $hasEnd) {
         if (-not $hasStart -or -not $hasEnd) {
             throw (New-AdoError 'Both -RightFileStartLine and -RightFileEndLine are required together')
         }
@@ -102,7 +102,7 @@ try {
     $context = Resolve-AdoContext -Org $Org -Project $Project -Repo $Repo -IncludeRepo
     $repoName = Assert-AdoContextValue -Context $context -Key 'repo' -Description 'repository name'
     $availability = Get-AdoBackendAvailability -Context $context
-    $resolvedBackend = Resolve-AdoBackend -Requested $Backend -Availability $availability
+    $resolvedBackend = Resolve-AdoBackend -Requested $Backend -Availability $availability -Supported 'rest'
     if ($resolvedBackend -ne 'rest') { throw (New-AdoError 'pr-comment.ps1 currently supports only the REST backend') }
 
     $requestBody = [ordered]@{

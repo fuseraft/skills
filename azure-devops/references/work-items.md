@@ -1,6 +1,6 @@
 # Work item scripts
 
-Full reference for the work item scripts in `scripts/`. All scripts currently require `-Backend rest`. `auto` resolves to `rest` only when the Azure CLI (`az`) is not installed, so pass `-Backend rest` on machines that have it. See the top-level `README.md` for environment variables and common flags shared across all scripts.
+Full reference for the work item scripts in `scripts/`. All scripts currently require `-Backend rest` (or `auto`, which resolves to `rest`). See the top-level `README.md` for environment variables and common flags shared across all scripts.
 
 #### `scripts/work-item-get.ps1`
 Retrieves a work item by ID through REST.
@@ -68,7 +68,7 @@ pwsh -File scripts/work-item-create.ps1 -Backend rest -Type Bug -Title "Example 
 rich-text fields in Azure DevOps — a literal `\n` renders as nothing in the work item UI, so
 raw plain text collapses into one run-on block. Pass plain text with real blank lines between
 paragraphs and `- `/`* ` for bullet lines; both scripts auto-convert that into `<p>`/`<br>`/`<ul>`
-HTML before sending it. If you already have HTML, pass it as-is — text containing `<` is sent
+HTML before sending it (Windows CRLF line endings are fine). If you already have HTML, pass it as-is — text containing `<` is sent
 through unchanged.
 
 #### `scripts/work-item-delete.ps1`

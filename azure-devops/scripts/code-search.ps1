@@ -80,7 +80,7 @@ $context = Resolve-AdoContext -Org $Org -Project $Project
 try {
     $projectName = Assert-AdoContextValue -Context $context -Key 'project' -Description 'project name'
     $availability = Get-AdoBackendAvailability -Context $context
-    $resolvedBackend = Resolve-AdoBackend -Requested $Backend -Availability $availability
+    $resolvedBackend = Resolve-AdoBackend -Requested $Backend -Availability $availability -Supported 'rest'
     if ($resolvedBackend -ne 'rest') { throw (New-AdoError 'code-search.ps1 currently supports only the REST backend') }
 
     $filters = [ordered]@{ Project = @($projectName) }
