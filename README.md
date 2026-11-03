@@ -69,6 +69,7 @@ Converts GitHub-flavored Markdown to a Word document with a single bundled, sche
 - Headings map to real Word *Heading* styles, and `#anchor` links jump to them
 - Nested/ordered/lettered/task lists with real Word numbering, block quotes, GitHub alerts, footnotes
 - Pipe and grid tables (alignment, repeating header row, colspan/rowspan), code blocks, images (PNG/JPEG/GIF/BMP, scaled to the page)
+- ` ```mermaid ` diagrams rendered in-process to embedded images (Mermaider + Svg.Skia; no browser or Node)
 - A safe subset of raw HTML; anything that can't be rendered produces a `warning:` instead of vanishing
 - Output is validated against the OpenXML schema and written atomically; local images are confined to an image root
 

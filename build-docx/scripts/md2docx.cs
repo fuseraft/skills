@@ -1,5 +1,8 @@
 #:package Markdig@1.2.0
 #:package DocumentFormat.OpenXml@3.5.1
+#:package Mermaider@0.15.1
+#:package Svg.Skia@5.2.3
+#:package SkiaSharp.NativeAssets.Linux@4.148.0
 
 using System.Globalization;
 using System.Net;
@@ -41,6 +44,7 @@ static class Cli
         options:
           --page letter|a4      page size (default: letter)
           --image-root DIR      only embed local images under DIR (default: the input file's directory)
+          --no-mermaid          keep ```mermaid fences as code instead of rendering them as diagrams
           --strict              exit 3 if any warning was raised (the file is still written)
           -h, --help            show this help
 
@@ -52,6 +56,7 @@ static class Cli
         string? input = null, output = null, imageRoot = null;
         var page = "letter";
         var strict = false;
+        var mermaid = true;
 
         for (var i = 0; i < args.Length; i++)
         {
@@ -63,6 +68,9 @@ static class Cli
                     return 0;
                 case "--strict":
                     strict = true;
+                    break;
+                case "--no-mermaid":
+                    mermaid = false;
                     break;
                 case "--page" or "--image-root":
                     if (i + 1 >= args.Length) return Fail($"{a} requires a value");
@@ -98,7 +106,7 @@ static class Cli
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(output)!);
-            result = new Converter(baseDir, root, page == "a4").Convert(markdown, temp);
+            result = new Converter(baseDir, root, page == "a4", mermaid).Convert(markdown, temp);
             if (result.ValidationErrors.Count > 0)
             {
                 foreach (var e in result.ValidationErrors) Console.Error.WriteLine($"error: invalid docx structure: {e}");
@@ -237,6 +245,122 @@ static class ImageProbe
     }
 }
 
+static class MermaidImage
+{
+    const float Scale = 3f;
+    const int MaxPixels = 6000;
+
+    public static bool TryRender(string source, out byte[] png, out double widthPx, out double heightPx, out string? problem)
+    {
+        png = []; widthPx = heightPx = 0; problem = null;
+        // Mermaider detects the diagram type from the first line, so a leading blank or %% comment line
+        // (which Mermaid ignores) would send a sequence or class diagram to the flowchart parser.
+        var lines = source.Split('\n');
+        var skip = lines.TakeWhile(l => l.Trim() is var t && (t.Length == 0 || (t.StartsWith("%%", StringComparison.Ordinal) && !t.StartsWith("%%{", StringComparison.Ordinal)))).Count();
+        source = string.Join('\n', lines.Skip(skip));
+        try
+        {
+            var svg = SvgFlattener.Flatten(Mermaider.MermaidRenderer.RenderSvg(source, new Mermaider.Models.RenderOptions { Padding = 16 }));
+            using var doc = new Svg.Skia.SKSvg();
+            using (var input = new MemoryStream(Encoding.UTF8.GetBytes(svg))) doc.Load(input);
+            if (doc.Picture is not { } picture || picture.CullRect.Width <= 0 || picture.CullRect.Height <= 0)
+            {
+                problem = "the renderer produced an empty picture";
+                return false;
+            }
+            (widthPx, heightPx) = (picture.CullRect.Width, picture.CullRect.Height);
+            var scale = Math.Min(Scale, MaxPixels / (float)Math.Max(widthPx, heightPx));
+            using var output = new MemoryStream();
+            if (!doc.Save(output, SkiaSharp.SKColors.White, SkiaSharp.SKEncodedImageFormat.Png, 100, scale, scale))
+            {
+                problem = "rasterizing the diagram failed";
+                return false;
+            }
+            png = output.ToArray();
+            return true;
+        }
+        catch (Mermaider.MermaidParseException ex) { problem = ex.Message; }
+        catch (TypeInitializationException ex) when (ex.TypeName?.StartsWith("SkiaSharp.", StringComparison.Ordinal) == true)
+        {
+            problem = "the SkiaSharp native library could not load; on Linux install fontconfig (Debian/Ubuntu: apt-get install libfontconfig1)";
+        }
+        catch (Exception ex) { problem = $"{ex.GetType().Name}: {(ex.InnerException ?? ex).Message}"; }
+        return false;
+    }
+}
+
+// Mermaider themes its SVG with CSS custom properties and color-mix(), which neither Svg.Skia nor Word evaluate;
+// resolve them to literal colors so the diagram paints instead of falling back to black.
+static class SvgFlattener
+{
+    static readonly Regex Decl = new(@"(--[\w-]+)\s*:\s*([^;""]+)", RegexOptions.Compiled);
+    static readonly Regex Innermost = new(@"\b(var|color-mix)\(([^()]*)\)", RegexOptions.Compiled);
+    const char Unresolved = '\u0001';
+
+    public static string Flatten(string svg)
+    {
+        var vars = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (Match m in Decl.Matches(svg)) vars.TryAdd(m.Groups[1].Value, m.Groups[2].Value.Trim());
+
+        string Resolve(string text, int depth)
+        {
+            if (depth > 20) return text;
+            string prev;
+            do
+            {
+                prev = text;
+                text = Innermost.Replace(text, m => m.Groups[1].Value == "var"
+                    ? Var(m.Groups[2].Value, depth)
+                    : Mix(m.Groups[2].Value) ?? m.Value.Replace("color-mix(", $"color-mix{Unresolved}("));
+            } while (text != prev);
+            return text.Replace(Unresolved.ToString(), string.Empty);
+        }
+
+        string Var(string args, int depth)
+        {
+            var comma = args.IndexOf(',');
+            var name = (comma < 0 ? args : args[..comma]).Trim();
+            if (vars.TryGetValue(name, out var value)) return Resolve(value, depth + 1);
+            return comma < 0 ? "none" : args[(comma + 1)..].Trim();
+        }
+
+        var body = svg.IndexOf("</style>", StringComparison.Ordinal) is var i and >= 0 ? i : 0;
+        return svg[..body] + Resolve(svg[body..], 0);
+    }
+
+    static string? Mix(string args)
+    {
+        var parts = args.Split(',').Select(x => x.Trim()).ToArray();
+        if (parts.Length != 3 || parts[0] != "in srgb") return null;
+        if (!Stop(parts[1], out var c1, out var p1) || !Stop(parts[2], out var c2, out var p2)) return null;
+        double w1 = p1 ?? (p2 is { } q2 ? 100 - q2 : 50), w2 = p2 ?? 100 - w1;
+        if (w1 + w2 <= 0) return null;
+        (w1, w2) = (w1 / (w1 + w2), w2 / (w1 + w2));
+        // premultiplied-alpha interpolation, as CSS Color 5 specifies
+        var a = c1.A * w1 + c2.A * w2;
+        double Ch(double x, double y) => a == 0 ? 0 : (x * c1.A * w1 + y * c2.A * w2) / a;
+        int R(double v) => (int)Math.Round(Math.Clamp(v, 0, 255));
+        var (r, g, b) = (R(Ch(c1.R, c2.R)), R(Ch(c1.G, c2.G)), R(Ch(c1.B, c2.B)));
+        return a >= 0.999 ? $"#{r:x2}{g:x2}{b:x2}" : string.Create(CultureInfo.InvariantCulture, $"rgba({r},{g},{b},{a:0.###})");
+    }
+
+    static bool Stop(string s, out (double R, double G, double B, double A) color, out double? pct)
+    {
+        color = default; pct = null;
+        var sp = s.LastIndexOf(' ');
+        if (sp > 0 && s.EndsWith('%'))
+        {
+            if (!double.TryParse(s[(sp + 1)..^1], NumberStyles.Float, CultureInfo.InvariantCulture, out var v)) return false;
+            pct = v;
+            s = s[..sp].Trim();
+        }
+        if (s == "transparent") return true;
+        if (!SkiaSharp.SKColor.TryParse(s, out var parsed)) return false;
+        color = (parsed.Red, parsed.Green, parsed.Blue, parsed.Alpha / 255.0);
+        return true;
+    }
+}
+
 sealed class Converter
 {
     const int TwipEmu = 635;
@@ -269,6 +393,7 @@ sealed class Converter
 
     readonly string _baseDir;
     readonly string _imageRoot;
+    readonly bool _mermaid;
     readonly int _pageW, _pageH, _contentW;
     readonly List<string> _warnings = [];
     readonly HashSet<string> _warned = [];
@@ -288,10 +413,11 @@ sealed class Converter
     Run? _lastTextRun;
     RunFormat? _lastTextFormat;
 
-    public Converter(string baseDir, string imageRoot, bool a4)
+    public Converter(string baseDir, string imageRoot, bool a4, bool mermaid)
     {
         _baseDir = baseDir;
         _imageRoot = imageRoot;
+        _mermaid = mermaid;
         (_pageW, _pageH) = a4 ? (11906, 16838) : (12240, 15840);
         _contentW = _pageW - 2 * Margin;
     }
@@ -642,6 +768,9 @@ sealed class Converter
             case ParagraphBlock pb:
                 sink.Add(BuildParagraph(pb, c, null));
                 return;
+            case FencedCodeBlock fcb when _mermaid && string.Equals(fcb.Info, "mermaid", StringComparison.OrdinalIgnoreCase):
+                RenderMermaid(fcb, c, sink);
+                return;
             case CodeBlock cb:
                 RenderCode(cb.Lines.ToString().Replace("\r\n", "\n").Split('\n'), c, sink);
                 return;
@@ -741,6 +870,28 @@ sealed class Converter
             if (i == count - 1) SetSpacingAfter(p, 160);
             sink.Add(p);
         }
+    }
+
+    void RenderMermaid(FencedCodeBlock block, Ctx c, List<OpenXmlElement> sink)
+    {
+        var source = block.Lines.ToString().Replace("\r\n", "\n");
+        var kind = source.Split('\n').Select(l => l.Trim()).FirstOrDefault(l => l.Length > 0 && !l.StartsWith("%%", StringComparison.Ordinal)) ?? string.Empty;
+        kind = kind.Split(' ')[0];
+        var alt = kind.Length > 0 ? $"Mermaid {kind} diagram" : "Mermaid diagram";
+        string? problem;
+        Run? run = null;
+        if (MermaidImage.TryRender(source, out var png, out var widthPx, out var heightPx, out problem))
+            run = EmbedImage(png, "mermaid:" + System.Convert.ToHexString(System.Security.Cryptography.SHA1.HashData(png)), alt, c, (widthPx, heightPx), out problem);
+        if (run is null)
+        {
+            Warn($"mermaid diagram on line {block.Line + 1} was kept as a code block: {problem}");
+            RenderCode(source.Split('\n'), c, sink);
+            return;
+        }
+        var p = NewParagraph(c, null);
+        p.Append(run);
+        SetSpacingAfter(p, 160);
+        sink.Add(p);
     }
 
     void RenderAlert(AlertBlock alert, Ctx c, List<OpenXmlElement> sink)
@@ -1413,12 +1564,25 @@ sealed class Converter
             key = full;
         }
 
+        return EmbedImage(data, key, alt, c, null, out problem) ?? NotEmbeddable(url, out problem);
+    }
+
+    static Run? NotEmbeddable(string url, out string? problem)
+    {
+        problem = $"image '{Truncate(url)}' is not a PNG, JPEG, GIF or BMP (SVG/WebP are not supported); replaced by a text placeholder";
+        return null;
+    }
+
+    // displayPx overrides the pixel size for images rasterized above 1x, so they print at their intended size
+    Run? EmbedImage(byte[] data, string key, string alt, Ctx c, (double W, double H)? displayPx, out string? problem)
+    {
+        problem = null;
         if (!_imageParts.TryGetValue(key, out var part))
         {
             var info = ImageProbe.Probe(data);
             if (info is not { } known || known.Width <= 0 || known.Height <= 0)
             {
-                problem = $"image '{Truncate(url)}' is not a PNG, JPEG, GIF or BMP (SVG/WebP are not supported); replaced by a text placeholder";
+                problem = "the image data is not a PNG, JPEG, GIF or BMP";
                 return null;
             }
             var imagePart = known.ContentType switch
@@ -1434,7 +1598,8 @@ sealed class Converter
         }
 
         const double EmuPerPx = 9525;
-        double cx = part.Info.Width * EmuPerPx, cy = part.Info.Height * EmuPerPx;
+        var (pw, ph) = displayPx ?? (part.Info.Width, part.Info.Height);
+        double cx = pw * EmuPerPx, cy = ph * EmuPerPx;
         var maxW = (double)(c.ImageBudgetEmu ?? Math.Max(_contentW - c.Left, 1440) * (long)TwipEmu);
         var maxH = 8.0 * 914400;
         var scale = Math.Min(1.0, Math.Min(maxW / cx, maxH / cy));

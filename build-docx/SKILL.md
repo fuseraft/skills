@@ -1,12 +1,12 @@
 ---
 name: build-docx
-description: "Convert Markdown to a Word (.docx) document with a deterministic, schema-validated converter: GitHub-flavored Markdown including headings, nested and task lists, tables, code blocks, footnotes, images, alerts, and links. Trigger when the user wants a Word document or .docx, wants agent output (reports, specs, briefs, changelogs) exported to Word, or has a Markdown file to convert. If the content is only a description or outline, write it as Markdown first, then convert. Requires the .NET 10 SDK. Does not support templates, headers/footers, page numbers, or a table of contents."
-compatibility: "Requires the .NET 10 SDK (`dotnet`). The first run needs network access to restore two NuGet packages (Markdig, DocumentFormat.OpenXml)."
+description: "Convert Markdown to a Word (.docx) document with a deterministic, schema-validated converter: GitHub-flavored Markdown including headings, nested and task lists, tables, code blocks, footnotes, images, Mermaid diagrams, alerts, and links. Trigger when the user wants a Word document or .docx, wants agent output (reports, specs, briefs, changelogs) exported to Word, or has a Markdown file to convert. If the content is only a description or outline, write it as Markdown first, then convert. Requires the .NET 10 SDK. Does not support templates, headers/footers, page numbers, or a table of contents."
+compatibility: "Requires the .NET 10 SDK (`dotnet`). The first run needs network access to restore NuGet packages (Markdig, DocumentFormat.OpenXml, Mermaider, Svg.Skia/SkiaSharp). On Linux, Mermaid rendering also needs fontconfig (`libfontconfig1`); without it diagrams stay code blocks with a warning."
 ---
 
 # Build DOCX
 
-`scripts/md2docx.cs` converts Markdown to `.docx` (Markdig parser, OpenXML SDK writer). Use it as-is. Do not hand-write a Markdown parser or a `python-docx`/`docx` script: the converter already handles nesting, numbering, escaping, and Word's structural rules.
+`scripts/md2docx.cs` converts Markdown to `.docx` (Markdig parser, OpenXML SDK writer, Mermaider + Svg.Skia for diagrams). Use it as-is. Do not hand-write a Markdown parser or a `python-docx`/`docx` script: the converter already handles nesting, numbering, escaping, and Word's structural rules.
 
 ## Steps
 
@@ -14,12 +14,12 @@ compatibility: "Requires the .NET 10 SDK (`dotnet`). The first run needs network
 2. **Run the converter** using absolute paths. The shell tool works on every fuseraft version:
 
    ```bash
-   dotnet run <skill-dir>/scripts/md2docx.cs -- <input.md> [output.docx] [--page letter|a4] [--image-root DIR] [--strict]
+   dotnet run <skill-dir>/scripts/md2docx.cs -- <input.md> [output.docx] [--page letter|a4] [--image-root DIR] [--no-mermaid] [--strict]
    ```
 
    `<skill-dir>` is this skill's directory (`~/.fuseraft/skills/build-docx` when installed globally). Recent fuseraft versions can instead run it with `run_skill_script`: script name `scripts/md2docx.cs` (the `scripts/` prefix is required) and the arguments as a string array. Older versions fail there because they cannot execute `.cs` files.
 
-   The output defaults to the input path with `.docx`. The first run restores packages (about 15 s); later runs take about 1 s.
+   The output defaults to the input path with `.docx`. The first run restores packages (about 25 s); later runs take a few seconds.
 3. **Read the result.** Stdout is `Wrote <path> (N paragraphs, N tables, N images, N footnotes)`. Every `warning:` line on stderr is a real degradation: fix the cause and re-run, or tell the user. Do not ignore them (see the table below).
 4. **Report** the absolute output path and any warnings you could not fix.
 
@@ -45,6 +45,7 @@ Use `--strict` when the document must be free of degradations.
 | Pipe and grid tables | Alignment, repeating header row, colspan/rowspan, inline formatting and images in cells, widths sized to content. |
 | Footnotes `[^1]` | Real Word footnotes. |
 | Images (PNG, JPEG, GIF, BMP; local files or `data:` URIs) | Embedded and scaled to the page. Linked images stay links. |
+| ` ```mermaid ` fences | Rendered in-process (no browser or Node) to a high-resolution PNG and embedded like an image. `--no-mermaid` keeps them as code. |
 | Links `http`, `https`, `mailto`, `tel`, `ftp`, relative | Hyperlinks; the title becomes the tooltip. |
 | Definition lists | Only Markdig syntax: `Term` then `:` followed by three spaces or a tab. |
 | YAML front matter | `title:` becomes the document title; the block is not rendered. |
@@ -61,8 +62,11 @@ Nothing is silently dropped: each of these produces a `warning:` line, and image
 | Missing image, or one outside the image root | Fix the path, or pass `--image-root` (default: the input file's directory). |
 | `#anchor` that matches no heading | Rendered as plain text. Fix the link (GitHub slugs keep `--` from `--json` and `read / write`). |
 | `javascript:` or another unsafe link scheme | Rendered as plain text. |
+| Mermaid diagram that cannot be rendered (unknown diagram type, empty fence, missing `libfontconfig1` on Linux) | Kept as a code block. Fix the header line, or install fontconfig. |
 
-Also not rendered: math (`$x^2$` stays literal), Mermaid and other diagram fences (they appear as code), and HTML attributes such as `align`. Custom templates, headers/footers, page numbers, and tables of contents are not supported. Say so rather than improvising a workaround.
+Mermaid is rendered by Mermaider, a .NET reimplementation, not by Mermaid itself. Layout differs slightly from GitHub's, and syntax errors inside a diagram body are not reported: a malformed line is skipped and the rest still renders, with no warning. Check diagrams before converting if they matter. Generic types written with `~` (`List~int~`) appear literally.
+
+Also not rendered: math (`$x^2$` stays literal), other diagram fences such as PlantUML or Graphviz (they appear as code), and HTML attributes such as `align`. Custom templates, headers/footers, page numbers, and tables of contents are not supported. Say so rather than improvising a workaround.
 
 ## Guarantees
 
