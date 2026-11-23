@@ -36,6 +36,8 @@ Run the `detect_stack` script, passing the project root as the first argument:
 pwsh -File scripts/detect_stack.ps1 /path/to/project
 ```
 
+If `pwsh` is not installed (stock Windows), run it with Windows PowerShell 5.1 instead: `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\detect_stack.ps1 C:\path\to\project`.
+
 The script checks for `.NET` marker files and returns a JSON object with `stack`, `display`, `markers`, `shell`, `temp_dir`, `scaffold`, `build`, `run`, `cleanup`, and `debug_idiom` fields — everything needed for Steps 2–4. Use these values directly rather than reconstructing them from `references/stack-patterns.md`.
 
 If the script returns `"stack": "unknown"`, this isn't a .NET project (or the markers aren't at the path given) — this skill doesn't apply; stop here rather than improvising a harness in another language.

@@ -181,7 +181,9 @@ or App Configuration at runtime rather than statically visible).
 ## Scripts
 
 All scripts are PowerShell (Windows PowerShell 5.1 compatible; also run under PowerShell 7+
-via `pwsh`). `scripts/DataMap.Common.ps1` is a shared helper library dot-sourced by the other
+via `pwsh`). The examples above use `pwsh -File`; if `pwsh` is not installed, run the same
+command as `powershell -NoProfile -ExecutionPolicy Bypass -File ...` (the policy flag is needed
+because Windows PowerShell's default policy on client machines refuses to run scripts). `scripts/DataMap.Common.ps1` is a shared helper library dot-sourced by the other
 four — don't invoke it directly.
 
 - `scripts/New-DataMapEntry.ps1` — Pass 1: append one row (named parameters) or a batch
