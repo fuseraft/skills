@@ -233,4 +233,5 @@ Each skill follows the structure:
 Conventions:
 - Check a skill with `fuseraft skills validate <skill-directory>` before committing it.
 - PowerShell scripts are written to run on Windows PowerShell 5.1 as well as PowerShell 7+ (see `datamap` and `azure-devops`): no ternary or `??` operators, and ASCII-only source, since 5.1 reads BOM-less UTF-8 files as ANSI.
+- Examples show `pwsh -File`. Each SKILL.md that runs scripts also gives the Windows PowerShell 5.1 form, `powershell -NoProfile -ExecutionPolicy Bypass -File`, for machines without `pwsh`.
 - Commits use the conventional-commit format described in the [commit skill](commit/SKILL.md).

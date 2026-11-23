@@ -44,8 +44,10 @@ The scripts are PowerShell (`.ps1`) and run on Windows PowerShell 5.1 or PowerSh
 
 ```powershell
 pwsh -File scripts/work-item-get.ps1 -Id 48520
-powershell -File scripts\work-item-get.ps1 -Id 48520     # Windows PowerShell 5.1
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\work-item-get.ps1 -Id 48520   # no pwsh: Windows PowerShell 5.1
 ```
+
+If `pwsh` is not installed, use the second form. Keep `-ExecutionPolicy Bypass`: Windows PowerShell's default policy on client machines refuses to run scripts. The examples in `references/` use `pwsh`; swap in the same prefix.
 
 - Parameters are PascalCase (`-Id`, `-Project`, `-Output`). Quote values that contain spaces; a value may start with `-` or contain newlines.
 - Options that used to repeat take a quoted, comma-separated list instead: `-Field "A=1,B=2"`, `-Repo "A,B"`. Quote it so it arrives as one string from any shell. A `-Field` value that itself contains a comma is fine as long as the text after the comma does not look like `NAME=`.

@@ -108,4 +108,7 @@ else {
     }
 }
 
-$result | ConvertTo-Json -Depth 4
+# Windows PowerShell 5.1 escapes < > ' as \u003c \u003e \u0027; unescape them so the
+# <name>/<ts>/<harness_dir> placeholders read the same as under pwsh. All three are legal in JSON strings.
+$json = $result | ConvertTo-Json -Depth 4
+$json.Replace('\u003c', '<').Replace('\u003e', '>').Replace('\u0027', "'")
